@@ -4,11 +4,28 @@ const path = require('path');
 const fs = require('fs');
 const sqlite3 = require('sqlite3').verbose();
 
-const db = new sqlite3.Database(path.join(__dirname, 'inventory.db'));
+const dbPath = path.join(__dirname, 'inventory.db');
+const db = new sqlite3.Database(dbPath, (err) => {
+  if (err) {
+    console.error('Failed to open database:', err);
+  } else {
+    console.log('Database opened successfully:', dbPath);
+  }
+});
+
 db.serialize(() => {
-  db.run('CREATE TABLE IF NOT EXISTS collectibles (id TEXT PRIMARY KEY, type TEXT, name TEXT, price REAL, stock INTEGER, image_url TEXT, tcg_id TEXT)');
-  db.run('CREATE TABLE IF NOT EXISTS transactions (id TEXT PRIMARY KEY, type TEXT, cash_in REAL, cash_out REAL, timestamp TEXT)');
-  db.run('CREATE TABLE IF NOT EXISTS transaction_items (id INTEGER PRIMARY KEY AUTOINCREMENT, transaction_id TEXT, item_id TEXT, role TEXT, trade_value REAL, negotiated_price REAL)');
+  db.run('CREATE TABLE IF NOT EXISTS collectibles (id TEXT PRIMARY KEY, type TEXT, name TEXT, price REAL, stock INTEGER, image_url TEXT, tcg_id TEXT, card_set TEXT, rarity TEXT)', (err) => {
+    if (err) console.error('Error creating collectibles table:', err);
+    else console.log('Collectibles table created or already exists');
+  });
+  db.run('CREATE TABLE IF NOT EXISTS transactions (id TEXT PRIMARY KEY, type TEXT, cash_in REAL, cash_out REAL, timestamp TEXT)', (err) => {
+    if (err) console.error('Error creating transactions table:', err);
+    else console.log('Transactions table created or already exists');
+  });
+  db.run('CREATE TABLE IF NOT EXISTS transaction_items (id INTEGER PRIMARY KEY AUTOINCREMENT, transaction_id TEXT, item_id TEXT, role TEXT, trade_value REAL, negotiated_price REAL)', (err) => {
+    if (err) console.error('Error creating transaction_items table:', err);
+    else console.log('Transaction_items table created or already exists');
+  });
 });
 
 let mainWindow;
@@ -50,8 +67,8 @@ ipcMain.on('add-item', (event, item) => {
   }
   const finalItem = { ...item, image_url: imageUrl ? `file://${imageUrl}` : null };
   if (item.role === 'trade_in') {
-    db.run('INSERT INTO collectibles (id, type, name, price, stock, image_url, tcg_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
-      [item.id, item.type, item.name, item.price, 1, finalItem.image_url, item.tcg_id || null],
+    db.run('INSERT INTO collectibles (id, type, name, price, stock, image_url, tcg_id, card_set, rarity) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [item.id, item.type, item.name, item.price, 1, finalItem.image_url, item.tcg_id || null, item.card_set || null, item.rarity || null],
       (err) => {
         if (err) {
           console.error('Add item error:', err);
@@ -130,7 +147,7 @@ ipcMain.on('get-tcg-card', async (event, cardName) => {
         price: row.price,
         image_url: row.image_url,
         tcg_id: row.tcg_id,
-        set: row.set || 'Unknown', // Fallback if not cached
+        card_set: row.card_set || 'Unknown', // Updated to card_set
         rarity: row.rarity || 'Unknown'
       }]);
       return;
@@ -154,21 +171,21 @@ ipcMain.on('get-tcg-card', async (event, cardName) => {
         price: card.tcgplayer?.prices?.holofoil?.market || card.tcgplayer?.prices?.normal?.market || 10,
         image_url: card.images.small,
         tcg_id: card.id,
-        set: card.set.name, // Add set name
-        rarity: card.rarity || 'Unknown' // Add rarity
+        card_set: card.set.name, // Updated to card_set
+        rarity: card.rarity || 'Unknown'
       }));
       console.log('Fetched TCG cards:', cards);
 
       // Cache all cards in DB
       cards.forEach(card => {
-        db.run('INSERT OR IGNORE INTO collectibles (id, type, name, price, stock, image_url, tcg_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
-          [card.tcg_id, card.type, card.name, card.price, 0, card.image_url, card.tcg_id],
+        db.run('INSERT OR IGNORE INTO collectibles (id, type, name, price, stock, image_url, tcg_id, card_set, rarity) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          [card.tcg_id, card.type, card.name, card.price, 0, card.image_url, card.tcg_id, card.card_set, card.rarity],
           (err) => {
             if (err) console.error('Cache insert error:', err);
           });
       });
 
-      event.reply('tcg-card-data', cards); // Send all cards
+      event.reply('tcg-card-data', cards);
     } catch (err) {
       console.error('TCG card fetch error:', err);
       event.reply('tcg-card-error', err.message);

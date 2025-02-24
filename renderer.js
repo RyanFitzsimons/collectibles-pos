@@ -239,21 +239,21 @@ function fetchTcgCard() {
   ipcRenderer.once('tcg-card-data', (event, cards) => {
     console.log('Received TCG card data:', cards);
     const cardList = document.getElementById('tcg-card-list');
-    cardList.innerHTML = ''; // Clear previous cards
+    cardList.innerHTML = '';
     cards.forEach(card => {
       const cardDiv = document.createElement('div');
       cardDiv.style = 'border: 1px solid #ccc; padding: 10px; width: 200px; text-align: center;';
       cardDiv.innerHTML = `
-        <img src="${card.image_url}" alt="${card.name}" style="width: 100%; max-height: 200px;">
+        <img src="${card.image_url}" alt="${card.name}" style="width: auto; height: auto; max-width: 180px; max-height: 250px;">
         <p><strong>${card.name}</strong></p>
-        <p>Set: ${card.set}</p>
+        <p>Set: ${card.card_set}</p>
         <p>Rarity: ${card.rarity}</p>
         <p>Price: £${card.price.toFixed(2)}</p>
         <button onclick='selectTcgCard(${JSON.stringify(card)})'>Select</button>
       `;
       cardList.appendChild(cardDiv);
     });
-    document.getElementById('tcg-modal').style.display = 'flex'; // Show modal
+    document.getElementById('tcg-modal').style.display = 'flex';
   });
   ipcRenderer.once('tcg-card-error', (event, error) => console.error('TCG card fetch failed:', error));
 }
@@ -264,6 +264,19 @@ function selectTcgCard(card) {
   document.getElementById('buy-type').value = card.type;
   document.getElementById('buy-price').value = card.price;
   document.getElementById('buy-trade-value').value = Math.floor(card.price * 0.5);
+
+  // Fetch and set image as file
+  fetch(card.image_url)
+    .then(response => response.blob())
+    .then(blob => {
+      const file = new File([blob], `${card.tcg_id}.png`, { type: 'image/png' });
+      const dataTransfer = new DataTransfer();
+      dataTransfer.items.add(file);
+      document.getElementById('buy-image').files = dataTransfer.files;
+      console.log('Image set in Buy form:', file);
+    })
+    .catch(err => console.error('Image fetch error:', err));
+
   closeTcgModal();
 }
 
