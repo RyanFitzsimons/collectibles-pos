@@ -8,6 +8,7 @@ db.serialize(() => {
   db.run('CREATE TABLE IF NOT EXISTS collectibles (id TEXT PRIMARY KEY, type TEXT, name TEXT, price REAL, stock INTEGER, image_url TEXT)');
   db.run('CREATE TABLE IF NOT EXISTS transactions (id TEXT PRIMARY KEY, type TEXT, cash_in REAL, cash_out REAL, timestamp TEXT)');
   db.run('CREATE TABLE IF NOT EXISTS transaction_items (id INTEGER PRIMARY KEY AUTOINCREMENT, transaction_id TEXT, item_id TEXT, role TEXT, trade_value REAL, negotiated_price REAL)');
+  db.run('CREATE TABLE IF NOT EXISTS bundles (id TEXT PRIMARY KEY, name TEXT, item_ids TEXT, bundle_price REAL, active INTEGER DEFAULT 1)');
 });
 
 let mainWindow;
@@ -109,5 +110,12 @@ ipcMain.on('get-transactions', (event) => {
          'LEFT JOIN collectibles c ON ti.item_id = c.id', (err, rows) => {
     if (err) console.error('Get transactions error:', err);
     event.reply('transactions-data', rows || []);
+  });
+});
+
+ipcMain.on('get-bundles', (event) => {
+  db.all('SELECT * FROM bundles WHERE active = 1', (err, rows) => {
+    if (err) console.error('Get bundles error:', err);
+    event.reply('bundles-data', rows || []);
   });
 });
