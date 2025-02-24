@@ -34,25 +34,16 @@ function showScreen(screen) {
       <input id="buy-type" placeholder="Type (e.g., pokemon_card)">
       <input id="buy-price" type="number" placeholder="Market Price">
       <input id="buy-trade-value" type="number" placeholder="Trade Value">
-      <select id="buy-condition">
-        <option value="">Select Condition</option>
-        <optgroup label="Raw Cards">
-          <option value="Near Mint">Near Mint</option>
-          <option value="Lightly Played">Lightly Played</option>
-          <option value="Moderately Played">Moderately Played</option>
-          <option value="Heavily Played">Heavily Played</option>
-          <option value="Damaged">Damaged</option>
-        </optgroup>
-        <optgroup label="Graded Cards">
-          <option value="PSA 10">PSA 10</option>
-          <option value="PSA 9">PSA 9</option>
-          <option value="PSA 8">PSA 8</option>
-          <option value="BGS 9.5">BGS 9.5</option>
-          <option value="BGS 9">BGS 9</option>
-          <option value="CGC 10">CGC 10</option>
-          <option value="CGC 9">CGC 9</option>
-        </optgroup>
+      <select id="buy-condition-category">
+        <option value="">Select Category</option>
+        <option value="Raw">Raw</option>
+        <option value="PSA">PSA</option>
+        <option value="CGC">CGC</option>
+        <option value="BGS">BGS</option>
+        <option value="TAG">TAG</option>
+        <option value="Other">Other</option>
       </select>
+      <input id="buy-condition-value" type="text" placeholder="Condition/Grade (e.g., NM, 7)">
       <input id="buy-image" type="file" accept="image/*">
       <input id="buy-tcg-id" type="hidden">
       <input id="buy-card-set" type="hidden">
@@ -240,7 +231,9 @@ function addToBuy() {
   const type = document.getElementById('buy-type').value;
   const price = parseFloat(document.getElementById('buy-price').value) || 0;
   const tradeValue = parseFloat(document.getElementById('buy-trade-value').value) || 0;
-  const condition = document.getElementById('buy-condition').value || null;
+  const conditionCategory = document.getElementById('buy-condition-category').value || '';
+  const conditionValue = document.getElementById('buy-condition-value').value || '';
+  const condition = conditionCategory && conditionValue ? `${conditionCategory} - ${conditionValue}` : null;
   const image = document.getElementById('buy-image').files[0];
   const id = Date.now().toString();
   const tcg_id = document.getElementById('buy-tcg-id').value || null;
@@ -307,7 +300,8 @@ function selectTcgCard(card) {
   document.getElementById('buy-type').value = card.type;
   document.getElementById('buy-price').value = card.price;
   document.getElementById('buy-trade-value').value = Math.floor(card.price * 0.5);
-  document.getElementById('buy-condition').value = ''; // Reset condition for manual input
+  document.getElementById('buy-condition-category').value = ''; // Reset for manual input
+  document.getElementById('buy-condition-value').value = '';
   document.getElementById('buy-tcg-id').value = card.tcg_id;
   document.getElementById('buy-card-set').value = card.card_set;
   document.getElementById('buy-rarity').value = card.rarity;
