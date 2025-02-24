@@ -14,7 +14,7 @@ const db = new sqlite3.Database(dbPath, (err) => {
 });
 
 db.serialize(() => {
-  db.run('CREATE TABLE IF NOT EXISTS collectibles (id TEXT PRIMARY KEY, type TEXT, name TEXT, price REAL, stock INTEGER, image_url TEXT, tcg_id TEXT, card_set TEXT, rarity TEXT)', (err) => {
+  db.run('CREATE TABLE IF NOT EXISTS collectibles (id TEXT PRIMARY KEY, type TEXT, name TEXT, price REAL, stock INTEGER, image_url TEXT, tcg_id TEXT, card_set TEXT, rarity TEXT, condition TEXT)', (err) => {
     if (err) console.error('Error creating collectibles table:', err);
     else console.log('Collectibles table created or already exists');
   });
@@ -56,7 +56,6 @@ app.on('window-all-closed', () => {
 ipcMain.on('add-item', async (event, item) => {
   let imageUrl = null;
 
-  // If image_url exists (TCG URL), download it
   if (item.image_url) {
     imageUrl = path.join(__dirname, 'images', `${item.id}-${item.tcg_id || 'card'}.png`);
     try {
@@ -90,12 +89,12 @@ ipcMain.on('add-item', async (event, item) => {
 
   const finalItem = {
     ...item,
-    image_url: imageUrl ? `file://${imageUrl}` : null // Set file:// path
+    image_url: imageUrl ? `file://${imageUrl}` : null
   };
   
   if (item.role === 'trade_in') {
-    db.run('INSERT INTO collectibles (id, type, name, price, stock, image_url, tcg_id, card_set, rarity) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [item.id, item.type, item.name, item.price, 1, finalItem.image_url, item.tcg_id || null, item.card_set || null, item.rarity || null],
+    db.run('INSERT INTO collectibles (id, type, name, price, stock, image_url, tcg_id, card_set, rarity, condition) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      [item.id, item.type, item.name, item.price, 1, finalItem.image_url, item.tcg_id || null, item.card_set || null, item.rarity || null, item.condition || null],
       (err) => {
         if (err) {
           console.error('Add item error:', err);
@@ -149,7 +148,7 @@ ipcMain.on('get-inventory', (event) => {
 });
 
 ipcMain.on('get-transactions', (event) => {
-  db.all('SELECT t.*, ti.item_id, ti.role, ti.trade_value, ti.negotiated_price, c.name AS item_name, c.type, c.price AS original_price, c.image_url ' +
+  db.all('SELECT t.*, ti.item_id, ti.role, ti.trade_value, ti.negotiated_price, c.name AS item_name, c.type, c.price AS original_price, c.image_url, c.condition ' +
          'FROM transactions t ' +
          'LEFT JOIN transaction_items ti ON t.id = ti.transaction_id ' +
          'LEFT JOIN collectibles c ON ti.item_id = c.id', (err, rows) => {
@@ -174,7 +173,8 @@ ipcMain.on('get-tcg-card', async (event, cardName) => {
         image_url: row.image_url,
         tcg_id: row.tcg_id,
         card_set: row.card_set || 'Unknown',
-        rarity: row.rarity || 'Unknown'
+        rarity: row.rarity || 'Unknown',
+        condition: row.condition || 'Not Set'
       }]);
       return;
     }
@@ -210,8 +210,8 @@ ipcMain.on('get-tcg-card', async (event, cardName) => {
       console.log('Fetched TCG cards:', cards);
 
       cards.forEach(card => {
-        db.run('INSERT OR IGNORE INTO collectibles (id, type, name, price, stock, image_url, tcg_id, card_set, rarity) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          [card.tcg_id, card.type, card.name, card.price, 0, card.image_url, card.tcg_id, card.card_set, card.rarity],
+        db.run('INSERT OR IGNORE INTO collectibles (id, type, name, price, stock, image_url, tcg_id, card_set, rarity, condition) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          [card.tcg_id, card.type, card.name, card.price, 0, card.image_url, card.tcg_id, card.card_set, card.rarity, null],
           (err) => {
             if (err) console.error('Cache insert error:', err);
           });

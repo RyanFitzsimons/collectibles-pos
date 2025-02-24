@@ -34,6 +34,25 @@ function showScreen(screen) {
       <input id="buy-type" placeholder="Type (e.g., pokemon_card)">
       <input id="buy-price" type="number" placeholder="Market Price">
       <input id="buy-trade-value" type="number" placeholder="Trade Value">
+      <select id="buy-condition">
+        <option value="">Select Condition</option>
+        <optgroup label="Raw Cards">
+          <option value="Near Mint">Near Mint</option>
+          <option value="Lightly Played">Lightly Played</option>
+          <option value="Moderately Played">Moderately Played</option>
+          <option value="Heavily Played">Heavily Played</option>
+          <option value="Damaged">Damaged</option>
+        </optgroup>
+        <optgroup label="Graded Cards">
+          <option value="PSA 10">PSA 10</option>
+          <option value="PSA 9">PSA 9</option>
+          <option value="PSA 8">PSA 8</option>
+          <option value="BGS 9.5">BGS 9.5</option>
+          <option value="BGS 9">BGS 9</option>
+          <option value="CGC 10">CGC 10</option>
+          <option value="CGC 9">CGC 9</option>
+        </optgroup>
+      </select>
       <input id="buy-image" type="file" accept="image/*">
       <input id="buy-tcg-id" type="hidden">
       <input id="buy-card-set" type="hidden">
@@ -44,7 +63,7 @@ function showScreen(screen) {
         ${buyItems.map(item => `
           <li>
             ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}" style="max-width: 50px;">` : ''}
-            ${item.name} - £${item.tradeValue}
+            ${item.name} - £${item.tradeValue} (${item.condition || 'Not Set'})
           </li>
         `).join('')}
       </ul>
@@ -126,7 +145,8 @@ function showScreen(screen) {
             trade_value: row.trade_value,
             negotiated_price: row.negotiated_price,
             original_price: row.original_price,
-            image_url: row.image_url
+            image_url: row.image_url,
+            condition: row.condition
           });
         }
       });
@@ -140,7 +160,7 @@ function showScreen(screen) {
                 ${tx.items.map(item => `
                   <li>
                     ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}">` : ''}
-                    ${item.name} (${item.role === 'trade_in' ? 'Trade-In' : item.role === 'trade_out' ? 'Trade-Out' : 'Sold'}) - 
+                    ${item.name} (${item.condition || 'Not Set'}) (${item.role === 'trade_in' ? 'Trade-In' : item.role === 'trade_out' ? 'Trade-Out' : 'Sold'}) - 
                     ${item.role === 'trade_in' ? `Trade Value: £${item.trade_value}` : `Sold For: £${item.negotiated_price || item.original_price}`}
                   </li>
                 `).join('')}
@@ -220,6 +240,7 @@ function addToBuy() {
   const type = document.getElementById('buy-type').value;
   const price = parseFloat(document.getElementById('buy-price').value) || 0;
   const tradeValue = parseFloat(document.getElementById('buy-trade-value').value) || 0;
+  const condition = document.getElementById('buy-condition').value || null;
   const image = document.getElementById('buy-image').files[0];
   const id = Date.now().toString();
   const tcg_id = document.getElementById('buy-tcg-id').value || null;
@@ -227,16 +248,17 @@ function addToBuy() {
   const rarity = document.getElementById('buy-rarity').value || null;
   const image_url = document.getElementById('buy-image-url').value || null;
 
-  console.log('Adding to buy:', { id, name, type, price, tradeValue, image: image ? image.name : null, tcg_id, card_set, rarity, image_url });
+  console.log('Adding to buy:', { id, name, type, price, tradeValue, condition, image: image ? image.name : null, tcg_id, card_set, rarity, image_url });
   ipcRenderer.send('add-item', {
     id,
     name,
     type,
     price,
     tradeValue,
+    condition,
     imagePath: image ? image.path : null,
     imageName: image ? image.name : null,
-    image_url, // Always send image_url
+    image_url,
     role: 'trade_in',
     tcg_id,
     card_set,
@@ -285,7 +307,7 @@ function selectTcgCard(card) {
   document.getElementById('buy-type').value = card.type;
   document.getElementById('buy-price').value = card.price;
   document.getElementById('buy-trade-value').value = Math.floor(card.price * 0.5);
-
+  document.getElementById('buy-condition').value = ''; // Reset condition for manual input
   document.getElementById('buy-tcg-id').value = card.tcg_id;
   document.getElementById('buy-card-set').value = card.card_set;
   document.getElementById('buy-rarity').value = card.rarity;
