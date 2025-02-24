@@ -140,15 +140,36 @@ ipcMain.on('complete-transaction', (event, { items, type, cashIn, cashOut }) => 
   );
 });
 
-ipcMain.on('get-inventory', (event) => {
-  db.all('SELECT * FROM collectibles WHERE stock > 0', (err, rows) => {
-    if (err) console.error('Get inventory error:', err);
-    event.reply('inventory-data', rows || []);
+ipcMain.on('get-inventory', (event, { page = 1, limit = 50, search = '' } = {}) => {
+  const offset = (page - 1) * limit;
+  const query = `
+    SELECT * FROM collectibles 
+    WHERE stock > 0 
+    AND (name LIKE ? OR card_set LIKE ?) 
+    ORDER BY name 
+    LIMIT ? OFFSET ?
+  `;
+  const params = [`%${search}%`, `%${search}%`, limit, offset];
+  
+  db.all(query, params, (err, rows) => {
+    if (err) {
+      console.error('Get inventory error:', err);
+      event.reply('inventory-data', { items: [], total: 0 });
+      return;
+    }
+    db.get('SELECT COUNT(*) as total FROM collectibles WHERE stock > 0 AND (name LIKE ? OR card_set LIKE ?)', [`%${search}%`, `%${search}%`], (err, countResult) => {
+      if (err) {
+        console.error('Get inventory count error:', err);
+        event.reply('inventory-data', { items: rows, total: 0 });
+      } else {
+        event.reply('inventory-data', { items: rows, total: countResult.total });
+      }
+    });
   });
 });
 
 ipcMain.on('get-transactions', (event) => {
-  db.all('SELECT t.*, ti.item_id, ti.role, ti.trade_value, ti.negotiated_price, c.name AS item_name, c.type, c.price AS original_price, c.image_url, c.condition ' +
+  db.all('SELECT t.*, ti.item_id, ti.role, ti.trade_value, ti.negotiated_price, c.name AS item_name, c.type, c.price AS original_price, c.image_url, c.condition, c.card_set ' +
          'FROM transactions t ' +
          'LEFT JOIN transaction_items ti ON t.id = ti.transaction_id ' +
          'LEFT JOIN collectibles c ON ti.item_id = c.id', (err, rows) => {

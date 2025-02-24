@@ -5,18 +5,18 @@ let tradeInCart = [];
 let tradeOutCart = [];
 let buyItems = [];
 let currentInventory = [];
+let sellPage = 1;
+let tradeOutPage = 1;
+const itemsPerPage = 50;
+let sellTotal = 0;
+let tradeOutTotal = 0;
 
 function showScreen(screen) {
   console.log('Showing screen:', screen, { sellCart, tradeInCart, tradeOutCart, buyItems });
   const content = document.getElementById('content');
   
   if (screen === 'sell') {
-    ipcRenderer.send('get-inventory');
-    ipcRenderer.once('inventory-data', (event, inventory) => {
-      currentInventory = inventory || [];
-      console.log('Loaded inventory:', currentInventory);
-      renderSellTab(currentInventory);
-    });
+    fetchInventory('sell', sellPage, '');
   } else if (screen === 'buy') {
     const totalPayout = buyItems.reduce((sum, item) => sum + item.tradeValue, 0);
     content.innerHTML = `
@@ -62,12 +62,7 @@ function showScreen(screen) {
       <button onclick="completeBuyTransaction()">Complete Buy</button>
     `;
   } else if (screen === 'trade') {
-    ipcRenderer.send('get-inventory');
-    ipcRenderer.once('inventory-data', (event, inventory) => {
-      currentInventory = inventory || [];
-      console.log('Loaded inventory:', currentInventory);
-      renderTradeTab(currentInventory);
-    });
+    fetchInventory('trade-out', tradeOutPage, '');
   } else if (screen === 'transactions') {
     ipcRenderer.send('get-transactions');
     ipcRenderer.once('transactions-data', (event, rows) => {
@@ -113,15 +108,16 @@ function showScreen(screen) {
   }
 }
 
-function renderSellTab(inventory) {
-  console.log('Rendering Sell tab with:', { inventory });
+function renderSellTab(inventory, total) {
+  console.log('Rendering Sell tab with:', { inventory, total });
   const totalListed = sellCart.reduce((sum, item) => sum + item.price, 0);
   const totalNegotiated = sellCart.reduce((sum, item) => sum + (item.negotiatedPrice || item.price), 0);
+  const totalPages = Math.ceil(total / itemsPerPage);
   document.getElementById('content').innerHTML = `
     <h3>Sell to Customer</h3>
     <div>
       <h4>Inventory</h4>
-      <input id="sell-search" type="text" placeholder="Search inventory (e.g., Charizard, Base Set)" oninput="filterInventory('sell', this.value)">
+      <input id="sell-search" type="text" placeholder="Search inventory (e.g., Charizard, Base Set)" oninput="fetchInventory('sell', ${sellPage}, this.value)">
       <ul id="sell-inventory-list">
         ${inventory.map(item => `
           <li>
@@ -130,6 +126,11 @@ function renderSellTab(inventory) {
           </li>
         `).join('')}
       </ul>
+      <div>
+        <button onclick="fetchInventory('sell', ${sellPage - 1})" ${sellPage === 1 ? 'disabled' : ''}>Previous</button>
+        <span>Page ${sellPage} of ${totalPages}</span>
+        <button onclick="fetchInventory('sell', ${sellPage + 1})" ${sellPage >= totalPages ? 'disabled' : ''}>Next</button>
+      </div>
     </div>
     <div>
       <h4>Sell Cart</h4>
@@ -150,11 +151,12 @@ function renderSellTab(inventory) {
   `;
 }
 
-function renderTradeTab(inventory) {
+function renderTradeTab(inventory, total) {
   const tradeInTotal = tradeInCart.reduce((sum, item) => sum + item.tradeValue, 0);
   const tradeOutTotal = tradeOutCart.reduce((sum, item) => sum + (item.negotiatedPrice || item.price), 0);
   const cashDue = Math.max(tradeOutTotal - tradeInTotal, 0);
   const cashBack = tradeInTotal > tradeOutTotal ? tradeInTotal - tradeOutTotal : 0;
+  const totalPages = Math.ceil(total / itemsPerPage);
 
   document.getElementById('content').innerHTML = `
     <h3>Trade with Customer</h3>
@@ -204,7 +206,7 @@ function renderTradeTab(inventory) {
     </div>
     <div>
       <h4>Trade-Out Inventory</h4>
-      <input id="trade-out-search" type="text" placeholder="Search inventory (e.g., Charizard, Base Set)" oninput="filterInventory('trade-out', this.value)">
+      <input id="trade-out-search" type="text" placeholder="Search inventory (e.g., Charizard, Base Set)" oninput="fetchInventory('trade-out', ${tradeOutPage}, this.value)">
       <ul id="trade-out-inventory-list">
         ${inventory.map(item => `
           <li>
@@ -213,6 +215,11 @@ function renderTradeTab(inventory) {
           </li>
         `).join('')}
       </ul>
+      <div>
+        <button onclick="fetchInventory('trade-out', ${tradeOutPage - 1})" ${tradeOutPage === 1 ? 'disabled' : ''}>Previous</button>
+        <span>Page ${tradeOutPage} of ${totalPages}</span>
+        <button onclick="fetchInventory('trade-out', ${tradeOutPage + 1})" ${tradeOutPage >= totalPages ? 'disabled' : ''}>Next</button>
+      </div>
       <h4>Trade-Out Cart</h4>
       <ul id="trade-out-items">
         ${tradeOutCart.map(item => `
@@ -232,21 +239,21 @@ function renderTradeTab(inventory) {
   `;
 }
 
-function filterInventory(context, searchTerm) {
-  const listId = context === 'sell' ? 'sell-inventory-list' : 'trade-out-inventory-list';
-  const list = document.getElementById(listId);
-  const search = searchTerm.toLowerCase();
-  const filtered = currentInventory.filter(item => 
-    item.name.toLowerCase().includes(search) || 
-    (item.card_set && item.card_set.toLowerCase().includes(search))
-  );
-  list.innerHTML = filtered.map(item => `
-    <li>
-      ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}">` : ''}
-      ${item.name} (${item.card_set || 'Unknown Set'}) - £${item.price} (${item.condition || 'Not Set'}) 
-      <button onclick="${context === 'sell' ? `addToSellCart` : `addToTradeOutCart`}('${item.id}', '${item.name}', ${item.price}, '${item.image_url || ''}', '${item.card_set || ''}', '${item.condition || ''}')">Add</button>
-    </li>
-  `).join('');
+function fetchInventory(context, page, searchTerm) {
+  if (page < 1) return;
+  ipcRenderer.send('get-inventory', { page, limit: itemsPerPage, search: searchTerm });
+  ipcRenderer.once('inventory-data', (event, { items, total }) => {
+    currentInventory = items;
+    if (context === 'sell') {
+      sellPage = page;
+      sellTotal = total;
+      renderSellTab(items, total);
+    } else if (context === 'trade-out') {
+      tradeOutPage = page;
+      tradeOutTotal = total;
+      renderTradeTab(items, total);
+    }
+  });
 }
 
 function addToSellCart(id, name, price, imageUrl, card_set, condition) {
