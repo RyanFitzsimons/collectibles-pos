@@ -4,21 +4,15 @@ let sellCart = [];
 let tradeInCart = [];
 let tradeOutCart = [];
 let buyItems = [];
+let currentInventory = [];
+let currentBundles = [];
 
 function showScreen(screen) {
-  console.log('Showing screen:', screen, { sellCart, tradeInCart, tradeOutCart, buyItems });
+  console.log('Showing screen:', screen, { sellCart, tradeInCart, tradeOutCart, buyItems, currentBundles });
   const content = document.getElementById('content');
   
   if (screen === 'sell') {
-    ipcRenderer.send('get-inventory');
-    ipcRenderer.once('inventory-data', (event, inventory) => {
-      ipcRenderer.send('get-bundles');
-      ipcRenderer.once('bundles-data', (event, bundleData) => {
-        const bundles = bundleData || [];
-        renderSellTab(inventory, bundles);
-      });
-      renderSellTab(inventory, []);
-    });
+    refreshSellTab();
   } else if (screen === 'buy') {
     const totalPayout = buyItems.reduce((sum, item) => sum + item.tradeValue, 0);
     content.innerHTML = `
@@ -142,7 +136,23 @@ function showScreen(screen) {
   }
 }
 
+function refreshSellTab() {
+  console.log('Refreshing Sell tab');
+  ipcRenderer.send('get-inventory');
+  ipcRenderer.once('inventory-data', (event, inventory) => {
+    console.log('Received inventory:', inventory);
+    currentInventory = inventory || [];
+    ipcRenderer.send('get-bundles');
+    ipcRenderer.once('bundles-data', (event, bundleData) => {
+      console.log('Received bundles:', bundleData);
+      currentBundles = bundleData || [];
+      renderSellTab(currentInventory, currentBundles);
+    });
+  });
+}
+
 function renderSellTab(inventory, bundles) {
+  console.log('Rendering Sell tab with:', { inventory, bundles });
   const totalListed = sellCart.reduce((sum, item) => sum + item.price, 0);
   const totalNegotiated = sellCart.reduce((sum, item) => sum + (item.negotiatedPrice || item.price), 0);
   document.getElementById('content').innerHTML = `
@@ -196,7 +206,7 @@ function renderSellTab(inventory, bundles) {
     </div>
   `;
 
-  // Add event listeners for bundle buttons
+  document.getElementById('create-bundle-btn').addEventListener('click', addBundle);
   document.querySelectorAll('.add-bundle-btn').forEach(button => {
     button.addEventListener('click', () => {
       const id = button.getAttribute('data-id');
@@ -211,13 +221,13 @@ function renderSellTab(inventory, bundles) {
 function addToSellCart(id, name, price, imageUrl) {
   console.log('Adding to sell cart:', { id, name, price, imageUrl });
   sellCart.push({ id, name, price, negotiatedPrice: price, image_url: imageUrl, role: 'sold' });
-  showScreen('sell');
+  refreshSellTab();
 }
 
 function updateSellPrice(id, newPrice) {
   console.log('Updating sell price:', { id, newPrice });
   sellCart = sellCart.map(item => item.id === id ? { ...item, negotiatedPrice: parseFloat(newPrice) || item.price } : item);
-  showScreen('sell');
+  refreshSellTab();
 }
 
 function addBundleToSellCart(id, name, bundlePrice, itemIds) {
@@ -254,7 +264,7 @@ function addBundleToSellCart(id, name, bundlePrice, itemIds) {
       });
     });
     console.log('Updated sellCart:', sellCart);
-    showScreen('sell');
+    refreshSellTab();
   });
 }
 
@@ -267,7 +277,7 @@ function completeSellTransaction() {
   ipcRenderer.once('transaction-complete', () => {
     console.log('Sell transaction completed');
     sellCart = [];
-    showScreen('sell');
+    refreshSellTab();
   });
   ipcRenderer.once('transaction-error', (event, error) => console.error('Sell transaction failed:', error));
 }
@@ -362,18 +372,12 @@ function addBundle() {
   ipcRenderer.send('add-bundle', { name, itemIds, bundlePrice });
   ipcRenderer.once('add-bundle-success', (event, bundle) => {
     console.log('Bundle added successfully:', bundle);
-    // Refresh bundles explicitly
-    ipcRenderer.send('get-inventory');
-    ipcRenderer.once('inventory-data', (event, inventory) => {
-      ipcRenderer.send('get-bundles');
-      ipcRenderer.once('bundles-data', (event, bundleData) => {
-        const bundles = bundleData || [];
-        renderSellTab(inventory, bundles);
-      });
-    });
+    currentBundles.push(bundle);
+    console.log('Updated currentBundles:', currentBundles);
+    renderSellTab(currentInventory, currentBundles);
   });
   ipcRenderer.once('add-bundle-error', (event, error) => console.error('Add bundle failed:', error));
 }
 
 // Initial load
-showScreen('sell');
+refreshSellTab();
