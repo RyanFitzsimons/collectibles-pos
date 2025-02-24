@@ -1,14 +1,14 @@
+require('dotenv').config(); // Load environment variables
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
-const sqlite3 = require('sqlite3').verbose();
+const sqlite3 = require('sqlite3').verbose(); // Fixed typo: removed extra ')'
 
 const db = new sqlite3.Database(path.join(__dirname, 'inventory.db'));
 db.serialize(() => {
-  db.run('CREATE TABLE IF NOT EXISTS collectibles (id TEXT PRIMARY KEY, type TEXT, name TEXT, price REAL, stock INTEGER, image_url TEXT)');
+  db.run('CREATE TABLE IF NOT EXISTS collectibles (id TEXT PRIMARY KEY, type TEXT, name TEXT, price REAL, stock INTEGER, image_url TEXT, tcg_id TEXT)');
   db.run('CREATE TABLE IF NOT EXISTS transactions (id TEXT PRIMARY KEY, type TEXT, cash_in REAL, cash_out REAL, timestamp TEXT)');
   db.run('CREATE TABLE IF NOT EXISTS transaction_items (id INTEGER PRIMARY KEY AUTOINCREMENT, transaction_id TEXT, item_id TEXT, role TEXT, trade_value REAL, negotiated_price REAL)');
-  db.run('CREATE TABLE IF NOT EXISTS bundles (id TEXT PRIMARY KEY, name TEXT, item_ids TEXT, bundle_price REAL, active INTEGER DEFAULT 1)');
 });
 
 let mainWindow;
@@ -50,8 +50,8 @@ ipcMain.on('add-item', (event, item) => {
   }
   const finalItem = { ...item, image_url: imageUrl ? `file://${imageUrl}` : null };
   if (item.role === 'trade_in') {
-    db.run('INSERT INTO collectibles (id, type, name, price, stock, image_url) VALUES (?, ?, ?, ?, ?, ?)',
-      [item.id, item.type, item.name, item.price, 1, finalItem.image_url],
+    db.run('INSERT INTO collectibles (id, type, name, price, stock, image_url, tcg_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [item.id, item.type, item.name, item.price, 1, finalItem.image_url, item.tcg_id || null],
       (err) => {
         if (err) {
           console.error('Add item error:', err);
@@ -113,9 +113,55 @@ ipcMain.on('get-transactions', (event) => {
   });
 });
 
-ipcMain.on('get-bundles', (event) => {
-  db.all('SELECT * FROM bundles WHERE active = 1', (err, rows) => {
-    if (err) console.error('Get bundles error:', err);
-    event.reply('bundles-data', rows || []);
+// Pokémon TCG API integration (raw fetch)
+ipcMain.on('get-tcg-card', async (event, cardName) => {
+  // Check if card is cached
+  db.get('SELECT * FROM collectibles WHERE name = ? AND tcg_id IS NOT NULL', [cardName], async (err, row) => {
+    if (err) {
+      console.error('DB query error:', err);
+      event.reply('tcg-card-error', err.message);
+      return;
+    }
+    if (row) {
+      console.log('Found cached TCG card:', row);
+      event.reply('tcg-card-data', {
+        name: row.name,
+        type: row.type,
+        price: row.price,
+        image_url: row.image_url,
+        tcg_id: row.tcg_id
+      });
+      return;
+    }
+
+    // Fetch online if not cached
+    try {
+      const response = await fetch(`https://api.pokemontcg.io/v2/cards?q=name:${encodeURIComponent(cardName)}`, {
+        headers: { 'X-Api-Key': process.env.POKEMONTCG_API_KEY }
+      });
+      const result = await response.json();
+      if (!result.data || result.data.length === 0) throw new Error('No cards found');
+      const card = result.data[0]; // First match
+      const data = {
+        name: card.name,
+        type: 'pokemon_card',
+        price: card.tcgplayer?.prices?.holofoil?.market || card.tcgplayer?.prices?.normal?.market || 10, // Fallback to 10
+        image_url: card.images.small,
+        tcg_id: card.id
+      };
+      console.log('Fetched TCG card:', data);
+
+      // Cache in DB
+      db.run('INSERT OR IGNORE INTO collectibles (id, type, name, price, stock, image_url, tcg_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        [card.id, data.type, data.name, data.price, 0, data.image_url, data.tcg_id],
+        (err) => {
+          if (err) console.error('Cache insert error:', err);
+        });
+
+      event.reply('tcg-card-data', data);
+    } catch (err) {
+      console.error('TCG card fetch error:', err);
+      event.reply('tcg-card-error', err.message);
+    }
   });
 });

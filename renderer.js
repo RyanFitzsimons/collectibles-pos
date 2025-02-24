@@ -21,6 +21,8 @@ function showScreen(screen) {
     const totalPayout = buyItems.reduce((sum, item) => sum + item.tradeValue, 0);
     content.innerHTML = `
       <h3>Buy from Customer</h3>
+      <input id="tcg-card-name" placeholder="Card Name (e.g., Charizard)">
+      <button onclick="fetchTcgCard()">Fetch Card</button>
       <input id="buy-name" placeholder="Name">
       <input id="buy-type" placeholder="Type (e.g., pokemon_card)">
       <input id="buy-price" type="number" placeholder="Market Price">
@@ -217,6 +219,25 @@ function addToBuy() {
     showScreen('buy');
   });
   ipcRenderer.once('add-item-error', (event, error) => console.error('Add item failed:', error));
+}
+
+function fetchTcgCard() {
+  const cardName = document.getElementById('tcg-card-name').value;
+  if (!cardName) {
+    console.error('No card name provided');
+    return;
+  }
+  console.log('Fetching TCG card:', cardName);
+  ipcRenderer.send('get-tcg-card', cardName);
+  ipcRenderer.once('tcg-card-data', (event, data) => {
+    console.log('Received TCG card data:', data);
+    document.getElementById('buy-name').value = data.name;
+    document.getElementById('buy-type').value = data.type;
+    document.getElementById('buy-price').value = data.price;
+    document.getElementById('buy-trade-value').value = Math.floor(data.price * 0.5); // Example trade value
+    // Note: Image is a URL, not a file—won’t auto-fill file input
+  });
+  ipcRenderer.once('tcg-card-error', (event, error) => console.error('TCG card fetch failed:', error));
 }
 
 function completeBuyTransaction() {
