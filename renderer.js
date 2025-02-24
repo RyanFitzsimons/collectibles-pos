@@ -64,84 +64,9 @@ function showScreen(screen) {
   } else if (screen === 'trade') {
     ipcRenderer.send('get-inventory');
     ipcRenderer.once('inventory-data', (event, inventory) => {
-      const tradeInTotal = tradeInCart.reduce((sum, item) => sum + item.tradeValue, 0);
-      const tradeOutTotal = tradeOutCart.reduce((sum, item) => sum + (item.negotiatedPrice || item.price), 0);
-      const cashDue = Math.max(tradeOutTotal - tradeInTotal, 0);
-      const cashBack = tradeInTotal > tradeOutTotal ? tradeInTotal - tradeOutTotal : 0;
-
-      content.innerHTML = `
-        <h3>Trade with Customer</h3>
-        <div>
-          <h4>Add to Inventory (Trade-In)</h4>
-          <input id="trade-in-tcg-card-name" placeholder="Card Name (e.g., Charizard)">
-          <button onclick="fetchTcgCard('trade-in')">Fetch Card</button>
-          <div id="tcg-modal-trade-in" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
-            <div style="background: white; margin: 50px auto; padding: 20px; width: 80%; max-height: 80%; overflow-y: auto;">
-              <h4>Select a Card</h4>
-              <div id="tcg-card-list-trade-in" style="display: flex; flex-wrap: wrap; gap: 20px;"></div>
-              <button onclick="closeTcgModal('trade-in')">Close</button>
-            </div>
-          </div>
-          <input id="trade-in-name" placeholder="Name">
-          <input id="trade-in-type" placeholder="Type (e.g., pokemon_card)">
-          <input id="trade-in-price" type="number" placeholder="Market Price">
-          <input id="trade-in-value" type="number" placeholder="Trade Value">
-          <select id="trade-in-condition-category">
-            <option value="">Select Category</option>
-            <option value="Raw">Raw</option>
-            <option value="PSA">PSA</option>
-            <option value="CGC">CGC</option>
-            <option value="BGS">BGS</option>
-            <option value="TAG">TAG</option>
-            <option value="Other">Other</option>
-          </select>
-          <input id="trade-in-condition-value" type="text" placeholder="Condition/Grade (e.g., NM, 7)">
-          <input id="trade-in-image" type="file" accept="image/*">
-          <input id="trade-in-tcg-id" type="hidden">
-          <input id="trade-in-card-set" type="hidden">
-          <input id="trade-in-rarity" type="hidden">
-          <input id="trade-in-image-url" type="hidden">
-          <button onclick="addToTradeInCart()">Add Trade-In</button>
-        </div>
-        <div>
-          <h4>Trade-In Cart</h4>
-          <ul id="trade-in-items">
-            ${tradeInCart.map(item => `
-              <li>
-                ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}" style="max-width: 50px;">` : ''}
-                ${item.name} (${item.card_set || 'Unknown Set'}) - £${item.tradeValue} (${item.condition || 'Not Set'})
-              </li>
-            `).join('')}
-          </ul>
-          <p>Total Trade-In Value: £${tradeInTotal.toFixed(2)}</p>
-        </div>
-        <div>
-          <h4>Trade-Out Inventory</h4>
-          <ul>
-            ${inventory.map(item => `
-              <li>
-                ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}">` : ''}
-                ${item.name} (${item.card_set || 'Unknown Set'}) - £${item.price} (${item.condition || 'Not Set'}) <button onclick="addToTradeOutCart('${item.id}', '${item.name}', ${item.price}, '${item.image_url || ''}', '${item.card_set || ''}', '${item.condition || ''}')">Add</button>
-              </li>
-            `).join('')}
-          </ul>
-          <h4>Trade-Out Cart</h4>
-          <ul id="trade-out-items">
-            ${tradeOutCart.map(item => `
-              <li>
-                ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}" style="max-width: 50px;">` : ''}
-                ${item.name} (${item.card_set || 'Unknown Set'}) - 
-                <input type="number" value="${item.negotiatedPrice}" onchange="updateTradeOutPrice('${item.id}', this.value)" style="width: 60px;">
-                (Original: £${item.price}, ${item.condition || 'Not Set'})
-              </li>
-            `).join('')}
-          </ul>
-          <p>Total Trade-Out Value: £${tradeOutTotal.toFixed(2)}</p>
-          <p>Cash Due: £${cashDue.toFixed(2)}</p>
-          ${cashBack > 0 ? `<p>Cash Back: £${cashBack.toFixed(2)}</p>` : ''}
-          <button onclick="completeTradeTransaction()">Complete Trade</button>
-        </div>
-      `;
+      currentInventory = inventory || [];
+      console.log('Loaded inventory:', currentInventory);
+      renderTradeTab(currentInventory);
     });
   } else if (screen === 'transactions') {
     ipcRenderer.send('get-transactions');
@@ -196,7 +121,8 @@ function renderSellTab(inventory) {
     <h3>Sell to Customer</h3>
     <div>
       <h4>Inventory</h4>
-      <ul>
+      <input id="sell-search" type="text" placeholder="Search inventory (e.g., Charizard, Base Set)" oninput="filterInventory('sell', this.value)">
+      <ul id="sell-inventory-list">
         ${inventory.map(item => `
           <li>
             ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}">` : ''}
@@ -222,6 +148,105 @@ function renderSellTab(inventory) {
       <button onclick="completeSellTransaction()">Complete Sell</button>
     </div>
   `;
+}
+
+function renderTradeTab(inventory) {
+  const tradeInTotal = tradeInCart.reduce((sum, item) => sum + item.tradeValue, 0);
+  const tradeOutTotal = tradeOutCart.reduce((sum, item) => sum + (item.negotiatedPrice || item.price), 0);
+  const cashDue = Math.max(tradeOutTotal - tradeInTotal, 0);
+  const cashBack = tradeInTotal > tradeOutTotal ? tradeInTotal - tradeOutTotal : 0;
+
+  document.getElementById('content').innerHTML = `
+    <h3>Trade with Customer</h3>
+    <div>
+      <h4>Add to Inventory (Trade-In)</h4>
+      <input id="trade-in-tcg-card-name" placeholder="Card Name (e.g., Charizard)">
+      <button onclick="fetchTcgCard('trade-in')">Fetch Card</button>
+      <div id="tcg-modal-trade-in" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
+        <div style="background: white; margin: 50px auto; padding: 20px; width: 80%; max-height: 80%; overflow-y: auto;">
+          <h4>Select a Card</h4>
+          <div id="tcg-card-list-trade-in" style="display: flex; flex-wrap: wrap; gap: 20px;"></div>
+          <button onclick="closeTcgModal('trade-in')">Close</button>
+        </div>
+      </div>
+      <input id="trade-in-name" placeholder="Name">
+      <input id="trade-in-type" placeholder="Type (e.g., pokemon_card)">
+      <input id="trade-in-price" type="number" placeholder="Market Price">
+      <input id="trade-in-value" type="number" placeholder="Trade Value">
+      <select id="trade-in-condition-category">
+        <option value="">Select Category</option>
+        <option value="Raw">Raw</option>
+        <option value="PSA">PSA</option>
+        <option value="CGC">CGC</option>
+        <option value="BGS">BGS</option>
+        <option value="TAG">TAG</option>
+        <option value="Other">Other</option>
+      </select>
+      <input id="trade-in-condition-value" type="text" placeholder="Condition/Grade (e.g., NM, 7)">
+      <input id="trade-in-image" type="file" accept="image/*">
+      <input id="trade-in-tcg-id" type="hidden">
+      <input id="trade-in-card-set" type="hidden">
+      <input id="trade-in-rarity" type="hidden">
+      <input id="trade-in-image-url" type="hidden">
+      <button onclick="addToTradeInCart()">Add Trade-In</button>
+    </div>
+    <div>
+      <h4>Trade-In Cart</h4>
+      <ul id="trade-in-items">
+        ${tradeInCart.map(item => `
+          <li>
+            ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}" style="max-width: 50px;">` : ''}
+            ${item.name} (${item.card_set || 'Unknown Set'}) - £${item.tradeValue} (${item.condition || 'Not Set'})
+          </li>
+        `).join('')}
+      </ul>
+      <p>Total Trade-In Value: £${tradeInTotal.toFixed(2)}</p>
+    </div>
+    <div>
+      <h4>Trade-Out Inventory</h4>
+      <input id="trade-out-search" type="text" placeholder="Search inventory (e.g., Charizard, Base Set)" oninput="filterInventory('trade-out', this.value)">
+      <ul id="trade-out-inventory-list">
+        ${inventory.map(item => `
+          <li>
+            ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}">` : ''}
+            ${item.name} (${item.card_set || 'Unknown Set'}) - £${item.price} (${item.condition || 'Not Set'}) <button onclick="addToTradeOutCart('${item.id}', '${item.name}', ${item.price}, '${item.image_url || ''}', '${item.card_set || ''}', '${item.condition || ''}')">Add</button>
+          </li>
+        `).join('')}
+      </ul>
+      <h4>Trade-Out Cart</h4>
+      <ul id="trade-out-items">
+        ${tradeOutCart.map(item => `
+          <li>
+            ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}" style="max-width: 50px;">` : ''}
+            ${item.name} (${item.card_set || 'Unknown Set'}) - 
+            <input type="number" value="${item.negotiatedPrice}" onchange="updateTradeOutPrice('${item.id}', this.value)" style="width: 60px;">
+            (Original: £${item.price}, ${item.condition || 'Not Set'})
+          </li>
+        `).join('')}
+      </ul>
+      <p>Total Trade-Out Value: £${tradeOutTotal.toFixed(2)}</p>
+      <p>Cash Due: £${cashDue.toFixed(2)}</p>
+      ${cashBack > 0 ? `<p>Cash Back: £${cashBack.toFixed(2)}</p>` : ''}
+      <button onclick="completeTradeTransaction()">Complete Trade</button>
+    </div>
+  `;
+}
+
+function filterInventory(context, searchTerm) {
+  const listId = context === 'sell' ? 'sell-inventory-list' : 'trade-out-inventory-list';
+  const list = document.getElementById(listId);
+  const search = searchTerm.toLowerCase();
+  const filtered = currentInventory.filter(item => 
+    item.name.toLowerCase().includes(search) || 
+    (item.card_set && item.card_set.toLowerCase().includes(search))
+  );
+  list.innerHTML = filtered.map(item => `
+    <li>
+      ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}">` : ''}
+      ${item.name} (${item.card_set || 'Unknown Set'}) - £${item.price} (${item.condition || 'Not Set'}) 
+      <button onclick="${context === 'sell' ? `addToSellCart` : `addToTradeOutCart`}('${item.id}', '${item.name}', ${item.price}, '${item.image_url || ''}', '${item.card_set || ''}', '${item.condition || ''}')">Add</button>
+    </li>
+  `).join('');
 }
 
 function addToSellCart(id, name, price, imageUrl, card_set, condition) {
