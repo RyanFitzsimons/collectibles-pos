@@ -124,45 +124,47 @@ ipcMain.on('get-tcg-card', async (event, cardName) => {
     }
     if (row) {
       console.log('Found cached TCG card:', row);
-      event.reply('tcg-card-data', {
+      event.reply('tcg-card-data', [{
         name: row.name,
         type: row.type,
         price: row.price,
         image_url: row.image_url,
         tcg_id: row.tcg_id
-      });
+      }]);
       return;
     }
 
     // Fetch online if not cached
     try {
       const url = `https://api.pokemontcg.io/v2/cards?q=name:*${encodeURIComponent(cardName.toLowerCase())}*`;
-      console.log('Fetching from URL:', url); // Debug URL
+      console.log('Fetching from URL:', url);
       const response = await fetch(url, {
         headers: { 'X-Api-Key': process.env.POKEMONTCG_API_KEY }
       });
       if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
       const result = await response.json();
-      console.log('API response:', result); // Debug raw response
+      console.log('API response:', result);
       if (!result.data || result.data.length === 0) throw new Error('No cards found');
-      const card = result.data[0]; // First match
-      const data = {
+      
+      const cards = result.data.map(card => ({
         name: card.name,
         type: 'pokemon_card',
         price: card.tcgplayer?.prices?.holofoil?.market || card.tcgplayer?.prices?.normal?.market || 10,
         image_url: card.images.small,
         tcg_id: card.id
-      };
-      console.log('Fetched TCG card:', data);
+      }));
+      console.log('Fetched TCG cards:', cards);
 
-      // Cache in DB
-      db.run('INSERT OR IGNORE INTO collectibles (id, type, name, price, stock, image_url, tcg_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
-        [card.id, data.type, data.name, data.price, 0, data.image_url, data.tcg_id],
-        (err) => {
-          if (err) console.error('Cache insert error:', err);
-        });
+      // Cache all cards in DB
+      cards.forEach(card => {
+        db.run('INSERT OR IGNORE INTO collectibles (id, type, name, price, stock, image_url, tcg_id) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          [card.tcg_id, card.type, card.name, card.price, 0, card.image_url, card.tcg_id],
+          (err) => {
+            if (err) console.error('Cache insert error:', err);
+          });
+      });
 
-      event.reply('tcg-card-data', data);
+      event.reply('tcg-card-data', cards); // Send all cards
     } catch (err) {
       console.error('TCG card fetch error:', err);
       event.reply('tcg-card-error', err.message);
