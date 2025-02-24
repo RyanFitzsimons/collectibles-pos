@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, net } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const sqlite3 = require('sqlite3').verbose();
@@ -53,19 +53,46 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 
-ipcMain.on('add-item', (event, item) => {
-  const imageUrl = item.imagePath ? path.join(__dirname, 'images', `${item.id}-${item.imageName}`) : null;
-  if (item.imagePath) {
+ipcMain.on('add-item', async (event, item) => {
+  let imageUrl = null;
+
+  // If image_url exists (TCG URL), download it
+  if (item.image_url) {
+    imageUrl = path.join(__dirname, 'images', `${item.id}-${item.tcg_id || 'card'}.png`);
     try {
-      fs.copyFileSync(item.imagePath, imageUrl);
-      console.log('Image saved:', imageUrl);
+      await new Promise((resolve, reject) => {
+        const request = net.request(item.image_url);
+        request.on('response', (response) => {
+          if (response.statusCode !== 200) {
+            reject(new Error(`Failed to fetch image: ${response.statusCode}`));
+            return;
+          }
+          const chunks = [];
+          response.on('data', (chunk) => chunks.push(chunk));
+          response.on('end', () => {
+            fs.mkdirSync(path.join(__dirname, 'images'), { recursive: true });
+            const buffer = Buffer.concat(chunks);
+            fs.writeFileSync(imageUrl, buffer);
+            console.log('Image downloaded and saved:', imageUrl);
+            resolve();
+          });
+          response.on('error', reject);
+        });
+        request.on('error', reject);
+        request.end();
+      });
     } catch (err) {
-      console.error('Image copy error:', err);
+      console.error('Image download error:', err);
       event.reply('add-item-error', err.message);
       return;
     }
   }
-  const finalItem = { ...item, image_url: imageUrl ? `file://${imageUrl}` : null };
+
+  const finalItem = {
+    ...item,
+    image_url: imageUrl ? `file://${imageUrl}` : null // Set file:// path
+  };
+  
   if (item.role === 'trade_in') {
     db.run('INSERT INTO collectibles (id, type, name, price, stock, image_url, tcg_id, card_set, rarity) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
       [item.id, item.type, item.name, item.price, 1, finalItem.image_url, item.tcg_id || null, item.card_set || null, item.rarity || null],
@@ -74,6 +101,7 @@ ipcMain.on('add-item', (event, item) => {
           console.error('Add item error:', err);
           event.reply('add-item-error', err.message);
         } else {
+          console.log('Item added to DB:', finalItem);
           event.reply('add-item-success', finalItem);
         }
       });
@@ -130,9 +158,7 @@ ipcMain.on('get-transactions', (event) => {
   });
 });
 
-// Pokémon TCG API integration (raw fetch)
 ipcMain.on('get-tcg-card', async (event, cardName) => {
-  // Check if card is cached
   db.get('SELECT * FROM collectibles WHERE name = ? AND tcg_id IS NOT NULL', [cardName], async (err, row) => {
     if (err) {
       console.error('DB query error:', err);
@@ -147,21 +173,28 @@ ipcMain.on('get-tcg-card', async (event, cardName) => {
         price: row.price,
         image_url: row.image_url,
         tcg_id: row.tcg_id,
-        card_set: row.card_set || 'Unknown', // Updated to card_set
+        card_set: row.card_set || 'Unknown',
         rarity: row.rarity || 'Unknown'
       }]);
       return;
     }
 
-    // Fetch online if not cached
     try {
       const url = `https://api.pokemontcg.io/v2/cards?q=name:*${encodeURIComponent(cardName.toLowerCase())}*`;
       console.log('Fetching from URL:', url);
-      const response = await fetch(url, {
-        headers: { 'X-Api-Key': process.env.POKEMONTCG_API_KEY }
+      const response = await new Promise((resolve, reject) => {
+        const request = net.request(url);
+        request.setHeader('X-Api-Key', process.env.POKEMONTCG_API_KEY);
+        request.on('response', resolve);
+        request.on('error', reject);
+        request.end();
       });
-      if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
-      const result = await response.json();
+      const result = await new Promise((resolve, reject) => {
+        const chunks = [];
+        response.on('data', (chunk) => chunks.push(chunk));
+        response.on('end', () => resolve(JSON.parse(Buffer.concat(chunks).toString())));
+        response.on('error', reject);
+      });
       console.log('API response:', result);
       if (!result.data || result.data.length === 0) throw new Error('No cards found');
       
@@ -171,12 +204,11 @@ ipcMain.on('get-tcg-card', async (event, cardName) => {
         price: card.tcgplayer?.prices?.holofoil?.market || card.tcgplayer?.prices?.normal?.market || 10,
         image_url: card.images.small,
         tcg_id: card.id,
-        card_set: card.set.name, // Updated to card_set
+        card_set: card.set.name,
         rarity: card.rarity || 'Unknown'
       }));
       console.log('Fetched TCG cards:', cards);
 
-      // Cache all cards in DB
       cards.forEach(card => {
         db.run('INSERT OR IGNORE INTO collectibles (id, type, name, price, stock, image_url, tcg_id, card_set, rarity) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
           [card.tcg_id, card.type, card.name, card.price, 0, card.image_url, card.tcg_id, card.card_set, card.rarity],

@@ -35,11 +35,15 @@ function showScreen(screen) {
       <input id="buy-price" type="number" placeholder="Market Price">
       <input id="buy-trade-value" type="number" placeholder="Trade Value">
       <input id="buy-image" type="file" accept="image/*">
+      <input id="buy-tcg-id" type="hidden">
+      <input id="buy-card-set" type="hidden">
+      <input id="buy-rarity" type="hidden">
+      <input id="buy-image-url" type="hidden">
       <button onclick="addToBuy()">Add Item</button>
       <ul id="buy-items">
         ${buyItems.map(item => `
           <li>
-            ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}">` : ''}
+            ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}" style="max-width: 50px;">` : ''}
             ${item.name} - £${item.tradeValue}
           </li>
         `).join('')}
@@ -218,9 +222,26 @@ function addToBuy() {
   const tradeValue = parseFloat(document.getElementById('buy-trade-value').value) || 0;
   const image = document.getElementById('buy-image').files[0];
   const id = Date.now().toString();
+  const tcg_id = document.getElementById('buy-tcg-id').value || null;
+  const card_set = document.getElementById('buy-card-set').value || null;
+  const rarity = document.getElementById('buy-rarity').value || null;
+  const image_url = document.getElementById('buy-image-url').value || null;
 
-  console.log('Adding to buy:', { id, name, type, price, tradeValue, image: image ? image.name : null });
-  ipcRenderer.send('add-item', { id, name, type, price, tradeValue, imagePath: image ? image.path : null, imageName: image ? image.name : null, role: 'trade_in' });
+  console.log('Adding to buy:', { id, name, type, price, tradeValue, image: image ? image.name : null, tcg_id, card_set, rarity, image_url });
+  ipcRenderer.send('add-item', {
+    id,
+    name,
+    type,
+    price,
+    tradeValue,
+    imagePath: image ? image.path : null,
+    imageName: image ? image.name : null,
+    image_url, // Always send image_url
+    role: 'trade_in',
+    tcg_id,
+    card_set,
+    rarity
+  });
   ipcRenderer.once('add-item-success', (event, item) => {
     buyItems.push(item);
     showScreen('buy');
@@ -265,17 +286,10 @@ function selectTcgCard(card) {
   document.getElementById('buy-price').value = card.price;
   document.getElementById('buy-trade-value').value = Math.floor(card.price * 0.5);
 
-  // Fetch and set image as file
-  fetch(card.image_url)
-    .then(response => response.blob())
-    .then(blob => {
-      const file = new File([blob], `${card.tcg_id}.png`, { type: 'image/png' });
-      const dataTransfer = new DataTransfer();
-      dataTransfer.items.add(file);
-      document.getElementById('buy-image').files = dataTransfer.files;
-      console.log('Image set in Buy form:', file);
-    })
-    .catch(err => console.error('Image fetch error:', err));
+  document.getElementById('buy-tcg-id').value = card.tcg_id;
+  document.getElementById('buy-card-set').value = card.card_set;
+  document.getElementById('buy-rarity').value = card.rarity;
+  document.getElementById('buy-image-url').value = card.image_url;
 
   closeTcgModal();
 }
