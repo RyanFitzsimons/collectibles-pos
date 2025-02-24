@@ -5,14 +5,18 @@ let tradeInCart = [];
 let tradeOutCart = [];
 let buyItems = [];
 let currentInventory = [];
-let currentBundles = [];
 
 function showScreen(screen) {
-  console.log('Showing screen:', screen, { sellCart, tradeInCart, tradeOutCart, buyItems, currentBundles });
+  console.log('Showing screen:', screen, { sellCart, tradeInCart, tradeOutCart, buyItems });
   const content = document.getElementById('content');
   
   if (screen === 'sell') {
-    refreshSellTab();
+    ipcRenderer.send('get-inventory');
+    ipcRenderer.once('inventory-data', (event, inventory) => {
+      currentInventory = inventory || [];
+      console.log('Loaded inventory:', currentInventory);
+      renderSellTab(currentInventory);
+    });
   } else if (screen === 'buy') {
     const totalPayout = buyItems.reduce((sum, item) => sum + item.tradeValue, 0);
     content.innerHTML = `
@@ -136,38 +140,12 @@ function showScreen(screen) {
   }
 }
 
-function refreshSellTab() {
-  console.log('Refreshing Sell tab');
-  ipcRenderer.send('get-inventory');
-  ipcRenderer.once('inventory-data', (event, inventory) => {
-    console.log('Received inventory:', inventory);
-    currentInventory = inventory || [];
-    ipcRenderer.send('get-bundles');
-    ipcRenderer.once('bundles-data', (event, bundleData) => {
-      console.log('Received bundles:', bundleData);
-      currentBundles = bundleData || [];
-      renderSellTab(currentInventory, currentBundles);
-    });
-  });
-}
-
-function renderSellTab(inventory, bundles) {
-  console.log('Rendering Sell tab with:', { inventory, bundles });
+function renderSellTab(inventory) {
+  console.log('Rendering Sell tab with:', { inventory });
   const totalListed = sellCart.reduce((sum, item) => sum + item.price, 0);
   const totalNegotiated = sellCart.reduce((sum, item) => sum + (item.negotiatedPrice || item.price), 0);
   document.getElementById('content').innerHTML = `
     <h3>Sell to Customer</h3>
-    <div>
-      <h4>Create Bundle</h4>
-      <input id="bundle-name" placeholder="Bundle Name">
-      <select id="bundle-items" multiple style="width: 200px; height: 100px;">
-        ${inventory.map(item => `
-          <option value="${item.id}">${item.name} (£${item.price})</option>
-        `).join('')}
-      </select>
-      <input id="bundle-price" type="number" placeholder="Bundle Price">
-      <button id="create-bundle-btn">Create Bundle</button>
-    </div>
     <div>
       <h4>Inventory</h4>
       <ul>
@@ -175,15 +153,6 @@ function renderSellTab(inventory, bundles) {
           <li>
             ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}">` : ''}
             ${item.name} (£${item.price}) <button onclick="addToSellCart('${item.id}', '${item.name}', ${item.price}, '${item.image_url || ''}')">Add</button>
-          </li>
-        `).join('')}
-      </ul>
-      <h4>Bundles</h4>
-      <ul id="bundles-list">
-        ${bundles.map((bundle, index) => `
-          <li>
-            ${bundle.name} (£${bundle.bundle_price}) 
-            <button class="add-bundle-btn" data-id="${bundle.id}" data-name="${bundle.name}" data-price="${bundle.bundle_price}" data-itemids='${bundle.item_ids}'>Add Bundle</button>
           </li>
         `).join('')}
       </ul>
@@ -205,67 +174,18 @@ function renderSellTab(inventory, bundles) {
       <button onclick="completeSellTransaction()">Complete Sell</button>
     </div>
   `;
-
-  document.getElementById('create-bundle-btn').addEventListener('click', addBundle);
-  document.querySelectorAll('.add-bundle-btn').forEach(button => {
-    button.addEventListener('click', () => {
-      const id = button.getAttribute('data-id');
-      const name = button.getAttribute('data-name');
-      const bundlePrice = parseFloat(button.getAttribute('data-price'));
-      const itemIds = button.getAttribute('data-itemids');
-      addBundleToSellCart(id, name, bundlePrice, itemIds);
-    });
-  });
 }
 
 function addToSellCart(id, name, price, imageUrl) {
   console.log('Adding to sell cart:', { id, name, price, imageUrl });
   sellCart.push({ id, name, price, negotiatedPrice: price, image_url: imageUrl, role: 'sold' });
-  refreshSellTab();
+  showScreen('sell');
 }
 
 function updateSellPrice(id, newPrice) {
   console.log('Updating sell price:', { id, newPrice });
   sellCart = sellCart.map(item => item.id === id ? { ...item, negotiatedPrice: parseFloat(newPrice) || item.price } : item);
-  refreshSellTab();
-}
-
-function addBundleToSellCart(id, name, bundlePrice, itemIds) {
-  console.log('Adding bundle to sell cart:', { id, name, bundlePrice, itemIds });
-  let parsedIds;
-  try {
-    parsedIds = JSON.parse(itemIds);
-  } catch (e) {
-    console.error('Failed to parse item_ids:', e, itemIds);
-    return;
-  }
-  ipcRenderer.send('get-inventory');
-  ipcRenderer.once('inventory-data', (event, inventory) => {
-    console.log('Inventory for bundle:', inventory);
-    const bundleItems = parsedIds.map(itemId => {
-      const item = inventory.find(i => i.id === itemId);
-      if (!item) console.warn(`Item ${itemId} not found in inventory`);
-      return item;
-    }).filter(item => item);
-    if (bundleItems.length === 0) {
-      console.error('No valid items found for bundle:', id);
-      return;
-    }
-    const totalOriginal = bundleItems.reduce((sum, item) => sum + item.price, 0);
-    bundleItems.forEach(item => {
-      const ratio = totalOriginal ? item.price / totalOriginal : 0;
-      sellCart.push({
-        id: item.id,
-        name: `${name} - ${item.name}`,
-        price: item.price,
-        negotiatedPrice: bundlePrice * ratio,
-        image_url: item.image_url,
-        role: 'sold'
-      });
-    });
-    console.log('Updated sellCart:', sellCart);
-    refreshSellTab();
-  });
+  showScreen('sell');
 }
 
 function completeSellTransaction() {
@@ -277,7 +197,7 @@ function completeSellTransaction() {
   ipcRenderer.once('transaction-complete', () => {
     console.log('Sell transaction completed');
     sellCart = [];
-    refreshSellTab();
+    showScreen('sell');
   });
   ipcRenderer.once('transaction-error', (event, error) => console.error('Sell transaction failed:', error));
 }
@@ -357,27 +277,5 @@ function completeTradeTransaction() {
   ipcRenderer.once('transaction-error', (event, error) => console.error('Trade transaction failed:', error));
 }
 
-function addBundle() {
-  const name = document.getElementById('bundle-name').value;
-  const bundlePrice = parseFloat(document.getElementById('bundle-price').value) || 0;
-  const itemSelect = document.getElementById('bundle-items');
-  const itemIds = Array.from(itemSelect.selectedOptions).map(option => option.value);
-  
-  if (!name || itemIds.length === 0 || bundlePrice <= 0) {
-    console.error('Invalid bundle input:', { name, itemIds, bundlePrice });
-    return;
-  }
-  
-  console.log('Adding bundle:', { name, itemIds, bundlePrice });
-  ipcRenderer.send('add-bundle', { name, itemIds, bundlePrice });
-  ipcRenderer.once('add-bundle-success', (event, bundle) => {
-    console.log('Bundle added successfully:', bundle);
-    currentBundles.push(bundle);
-    console.log('Updated currentBundles:', currentBundles);
-    renderSellTab(currentInventory, currentBundles);
-  });
-  ipcRenderer.once('add-bundle-error', (event, error) => console.error('Add bundle failed:', error));
-}
-
 // Initial load
-refreshSellTab();
+showScreen('sell');
