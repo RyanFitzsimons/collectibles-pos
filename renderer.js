@@ -163,7 +163,7 @@ function renderSellTab(inventory, total) {
   document.getElementById('sell-search').addEventListener('input', debounce((e) => {
     sellSearchTerm = e.target.value;
     fetchInventory('sell', 1, sellSearchTerm); // Reset to page 1 on search
-  }, 300));
+  }, 600));
 }
 
 function renderTradeTab(inventory, total) {
@@ -255,7 +255,7 @@ function renderTradeTab(inventory, total) {
   document.getElementById('trade-out-search').addEventListener('input', debounce((e) => {
     tradeOutSearchTerm = e.target.value;
     fetchInventory('trade-out', 1, tradeOutSearchTerm); // Reset to page 1 on search
-  }, 300));
+  }, 600));
 }
 
 function fetchInventory(context, page, searchTerm) {
