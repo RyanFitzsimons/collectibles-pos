@@ -54,7 +54,7 @@ function showScreen(screen) {
         ${buyItems.map(item => `
           <li>
             ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}" style="max-width: 50px;">` : ''}
-            ${item.name} - £${item.tradeValue} (${item.condition || 'Not Set'})
+            ${item.name} (${item.card_set || 'Unknown Set'}) - £${item.tradeValue} (${item.condition || 'Not Set'})
           </li>
         `).join('')}
       </ul>
@@ -300,7 +300,7 @@ function selectTcgCard(card) {
   document.getElementById('buy-type').value = card.type;
   document.getElementById('buy-price').value = card.price;
   document.getElementById('buy-trade-value').value = Math.floor(card.price * 0.5);
-  document.getElementById('buy-condition-category').value = ''; // Reset for manual input
+  document.getElementById('buy-condition-category').value = '';
   document.getElementById('buy-condition-value').value = '';
   document.getElementById('buy-tcg-id').value = card.tcg_id;
   document.getElementById('buy-card-set').value = card.card_set;
