@@ -85,8 +85,8 @@ function showScreen(screen) {
           <ul id="trade-in-items">
             ${tradeInCart.map(item => `
               <li>
-                ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}">` : ''}
-                ${item.name} - £${item.tradeValue}
+                ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}" style="max-width: 50px;">` : ''}
+                ${item.name} (${item.card_set || 'Unknown Set'}) - £${item.tradeValue} (${item.condition || 'Not Set'})
               </li>
             `).join('')}
           </ul>
@@ -98,7 +98,7 @@ function showScreen(screen) {
             ${inventory.map(item => `
               <li>
                 ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}">` : ''}
-                ${item.name} (£${item.price}) <button onclick="addToTradeOutCart('${item.id}', '${item.name}', ${item.price}, '${item.image_url || ''}')">Add</button>
+                ${item.name} (${item.card_set || 'Unknown Set'}) - £${item.price} (${item.condition || 'Not Set'}) <button onclick="addToTradeOutCart('${item.id}', '${item.name}', ${item.price}, '${item.image_url || ''}', '${item.card_set || ''}', '${item.condition || ''}')">Add</button>
               </li>
             `).join('')}
           </ul>
@@ -106,10 +106,10 @@ function showScreen(screen) {
           <ul id="trade-out-items">
             ${tradeOutCart.map(item => `
               <li>
-                ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}">` : ''}
-                ${item.name} - 
+                ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}" style="max-width: 50px;">` : ''}
+                ${item.name} (${item.card_set || 'Unknown Set'}) - 
                 <input type="number" value="${item.negotiatedPrice}" onchange="updateTradeOutPrice('${item.id}', this.value)" style="width: 60px;">
-                (Original: £${item.price})
+                (Original: £${item.price}, ${item.condition || 'Not Set'})
               </li>
             `).join('')}
           </ul>
@@ -137,7 +137,8 @@ function showScreen(screen) {
             negotiated_price: row.negotiated_price,
             original_price: row.original_price,
             image_url: row.image_url,
-            condition: row.condition
+            condition: row.condition,
+            card_set: row.card_set
           });
         }
       });
@@ -151,7 +152,7 @@ function showScreen(screen) {
                 ${tx.items.map(item => `
                   <li>
                     ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}">` : ''}
-                    ${item.name} (${item.condition || 'Not Set'}) (${item.role === 'trade_in' ? 'Trade-In' : item.role === 'trade_out' ? 'Trade-Out' : 'Sold'}) - 
+                    ${item.name} (${item.card_set || 'Unknown Set'}) (${item.condition || 'Not Set'}) (${item.role === 'trade_in' ? 'Trade-In' : item.role === 'trade_out' ? 'Trade-Out' : 'Sold'}) - 
                     ${item.role === 'trade_in' ? `Trade Value: £${item.trade_value}` : `Sold For: £${item.negotiated_price || item.original_price}`}
                   </li>
                 `).join('')}
@@ -176,7 +177,7 @@ function renderSellTab(inventory) {
         ${inventory.map(item => `
           <li>
             ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}">` : ''}
-            ${item.name} (£${item.price}) <button onclick="addToSellCart('${item.id}', '${item.name}', ${item.price}, '${item.image_url || ''}')">Add</button>
+            ${item.name} (${item.card_set || 'Unknown Set'}) - £${item.price} (${item.condition || 'Not Set'}) <button onclick="addToSellCart('${item.id}', '${item.name}', ${item.price}, '${item.image_url || ''}', '${item.card_set || ''}', '${item.condition || ''}')">Add</button>
           </li>
         `).join('')}
       </ul>
@@ -186,10 +187,10 @@ function renderSellTab(inventory) {
       <ul id="sell-cart-items">
         ${sellCart.map(item => `
           <li>
-            ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}">` : ''}
-            ${item.name} - 
+            ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}" style="max-width: 50px;">` : ''}
+            ${item.name} (${item.card_set || 'Unknown Set'}) - 
             <input type="number" value="${item.negotiatedPrice}" onchange="updateSellPrice('${item.id}', this.value)" style="width: 60px;">
-            (Original: £${item.price})
+            (Original: £${item.price}, ${item.condition || 'Not Set'})
           </li>
         `).join('')}
       </ul>
@@ -200,9 +201,9 @@ function renderSellTab(inventory) {
   `;
 }
 
-function addToSellCart(id, name, price, imageUrl) {
-  console.log('Adding to sell cart:', { id, name, price, imageUrl });
-  sellCart.push({ id, name, price, negotiatedPrice: price, image_url: imageUrl, role: 'sold' });
+function addToSellCart(id, name, price, imageUrl, card_set, condition) {
+  console.log('Adding to sell cart:', { id, name, price, imageUrl, card_set, condition });
+  sellCart.push({ id, name, price, negotiatedPrice: price, image_url: imageUrl, card_set, condition, role: 'sold' });
   showScreen('sell');
 }
 
@@ -328,9 +329,9 @@ function completeBuyTransaction() {
   ipcRenderer.once('transaction-error', (event, error) => console.error('Buy transaction failed:', error));
 }
 
-function addToTradeOutCart(id, name, price, imageUrl) {
-  console.log('Adding to trade-out cart:', { id, name, price, imageUrl });
-  tradeOutCart.push({ id, name, price, negotiatedPrice: price, image_url: imageUrl, role: 'trade_out' });
+function addToTradeOutCart(id, name, price, imageUrl, card_set, condition) {
+  console.log('Adding to trade-out cart:', { id, name, price, imageUrl, card_set, condition });
+  tradeOutCart.push({ id, name, price, negotiatedPrice: price, image_url: imageUrl, card_set, condition, role: 'trade_out' });
   showScreen('trade');
 }
 
