@@ -1,8 +1,8 @@
-require('dotenv').config(); // Load environment variables
+require('dotenv').config();
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
-const sqlite3 = require('sqlite3').verbose(); // Fixed typo: removed extra ')'
+const sqlite3 = require('sqlite3').verbose();
 
 const db = new sqlite3.Database(path.join(__dirname, 'inventory.db'));
 db.serialize(() => {
@@ -136,16 +136,20 @@ ipcMain.on('get-tcg-card', async (event, cardName) => {
 
     // Fetch online if not cached
     try {
-      const response = await fetch(`https://api.pokemontcg.io/v2/cards?q=name:${encodeURIComponent(cardName)}`, {
+      const url = `https://api.pokemontcg.io/v2/cards?q=name:*${encodeURIComponent(cardName.toLowerCase())}*`;
+      console.log('Fetching from URL:', url); // Debug URL
+      const response = await fetch(url, {
         headers: { 'X-Api-Key': process.env.POKEMONTCG_API_KEY }
       });
+      if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
       const result = await response.json();
+      console.log('API response:', result); // Debug raw response
       if (!result.data || result.data.length === 0) throw new Error('No cards found');
       const card = result.data[0]; // First match
       const data = {
         name: card.name,
         type: 'pokemon_card',
-        price: card.tcgplayer?.prices?.holofoil?.market || card.tcgplayer?.prices?.normal?.market || 10, // Fallback to 10
+        price: card.tcgplayer?.prices?.holofoil?.market || card.tcgplayer?.prices?.normal?.market || 10,
         image_url: card.images.small,
         tcg_id: card.id
       };
