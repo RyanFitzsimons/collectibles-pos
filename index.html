@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Collectibles POS</title>
+  <style>
+    body { font-family: Arial, sans-serif; }
+    nav { margin-bottom: 10px; }
+    button { margin-right: 5px; }
+    ul { list-style: none; padding: 0; }
+    li { margin: 5px 0; }
+    input { margin: 5px; }
+  </style>
+</head>
+<body>
+  <nav>
+    <button onclick="showScreen('pos')">POS</button>
+    <button onclick="showScreen('buy')">Buy/Trade</button>
+    <button onclick="showScreen('transactions')">Transactions</button>
+  </nav>
+  <div id="content"></div>
+  <script src="./renderer.js"></script>
+</body>
+</html>

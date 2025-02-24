@@ -1,0 +1,19 @@
+{
+  "name": "collectibles-pos",
+  "version": "1.0.0",
+  "description": "Inventory management and POS system for collectibles",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder"
+  },
+  "author": "Ryan",
+  "license": "ISC",
+  "dependencies": {
+    "electron": "28.2.3",
+    "sqlite3": "5.1.7"
+  },
+  "devDependencies": {
+    "electron-builder": "24.9.1"
+  }
+}
