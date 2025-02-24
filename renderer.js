@@ -10,13 +10,24 @@ let tradeOutPage = 1;
 const itemsPerPage = 50;
 let sellTotal = 0;
 let tradeOutTotal = 0;
+let sellSearchTerm = '';
+let tradeOutSearchTerm = '';
+
+// Debounce function to limit search frequency
+function debounce(func, wait) {
+  let timeout;
+  return function (...args) {
+    clearTimeout(timeout);
+    timeout = setTimeout(() => func.apply(this, args), wait);
+  };
+}
 
 function showScreen(screen) {
   console.log('Showing screen:', screen, { sellCart, tradeInCart, tradeOutCart, buyItems });
   const content = document.getElementById('content');
   
   if (screen === 'sell') {
-    fetchInventory('sell', sellPage, '');
+    fetchInventory('sell', sellPage, sellSearchTerm);
   } else if (screen === 'buy') {
     const totalPayout = buyItems.reduce((sum, item) => sum + item.tradeValue, 0);
     content.innerHTML = `
@@ -62,7 +73,7 @@ function showScreen(screen) {
       <button onclick="completeBuyTransaction()">Complete Buy</button>
     `;
   } else if (screen === 'trade') {
-    fetchInventory('trade-out', tradeOutPage, '');
+    fetchInventory('trade-out', tradeOutPage, tradeOutSearchTerm);
   } else if (screen === 'transactions') {
     ipcRenderer.send('get-transactions');
     ipcRenderer.once('transactions-data', (event, rows) => {
@@ -117,7 +128,7 @@ function renderSellTab(inventory, total) {
     <h3>Sell to Customer</h3>
     <div>
       <h4>Inventory</h4>
-      <input id="sell-search" type="text" placeholder="Search inventory (e.g., Charizard, Base Set)" oninput="fetchInventory('sell', ${sellPage}, this.value)">
+      <input id="sell-search" type="text" placeholder="Search inventory (e.g., Charizard, Base Set)" value="${sellSearchTerm}">
       <ul id="sell-inventory-list">
         ${inventory.map(item => `
           <li>
@@ -127,9 +138,9 @@ function renderSellTab(inventory, total) {
         `).join('')}
       </ul>
       <div>
-        <button onclick="fetchInventory('sell', ${sellPage - 1})" ${sellPage === 1 ? 'disabled' : ''}>Previous</button>
+        <button onclick="fetchInventory('sell', ${sellPage - 1}, sellSearchTerm)" ${sellPage === 1 ? 'disabled' : ''}>Previous</button>
         <span>Page ${sellPage} of ${totalPages}</span>
-        <button onclick="fetchInventory('sell', ${sellPage + 1})" ${sellPage >= totalPages ? 'disabled' : ''}>Next</button>
+        <button onclick="fetchInventory('sell', ${sellPage + 1}, sellSearchTerm)" ${sellPage >= totalPages ? 'disabled' : ''}>Next</button>
       </div>
     </div>
     <div>
@@ -149,6 +160,10 @@ function renderSellTab(inventory, total) {
       <button onclick="completeSellTransaction()">Complete Sell</button>
     </div>
   `;
+  document.getElementById('sell-search').addEventListener('input', debounce((e) => {
+    sellSearchTerm = e.target.value;
+    fetchInventory('sell', 1, sellSearchTerm); // Reset to page 1 on search
+  }, 300));
 }
 
 function renderTradeTab(inventory, total) {
@@ -206,7 +221,7 @@ function renderTradeTab(inventory, total) {
     </div>
     <div>
       <h4>Trade-Out Inventory</h4>
-      <input id="trade-out-search" type="text" placeholder="Search inventory (e.g., Charizard, Base Set)" oninput="fetchInventory('trade-out', ${tradeOutPage}, this.value)">
+      <input id="trade-out-search" type="text" placeholder="Search inventory (e.g., Charizard, Base Set)" value="${tradeOutSearchTerm}">
       <ul id="trade-out-inventory-list">
         ${inventory.map(item => `
           <li>
@@ -216,9 +231,9 @@ function renderTradeTab(inventory, total) {
         `).join('')}
       </ul>
       <div>
-        <button onclick="fetchInventory('trade-out', ${tradeOutPage - 1})" ${tradeOutPage === 1 ? 'disabled' : ''}>Previous</button>
+        <button onclick="fetchInventory('trade-out', ${tradeOutPage - 1}, tradeOutSearchTerm)" ${tradeOutPage === 1 ? 'disabled' : ''}>Previous</button>
         <span>Page ${tradeOutPage} of ${totalPages}</span>
-        <button onclick="fetchInventory('trade-out', ${tradeOutPage + 1})" ${tradeOutPage >= totalPages ? 'disabled' : ''}>Next</button>
+        <button onclick="fetchInventory('trade-out', ${tradeOutPage + 1}, tradeOutSearchTerm)" ${tradeOutPage >= totalPages ? 'disabled' : ''}>Next</button>
       </div>
       <h4>Trade-Out Cart</h4>
       <ul id="trade-out-items">
@@ -237,6 +252,10 @@ function renderTradeTab(inventory, total) {
       <button onclick="completeTradeTransaction()">Complete Trade</button>
     </div>
   `;
+  document.getElementById('trade-out-search').addEventListener('input', debounce((e) => {
+    tradeOutSearchTerm = e.target.value;
+    fetchInventory('trade-out', 1, tradeOutSearchTerm); // Reset to page 1 on search
+  }, 300));
 }
 
 function fetchInventory(context, page, searchTerm) {
