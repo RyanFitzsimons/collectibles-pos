@@ -23,9 +23,13 @@ function showScreen(screen) {
       <h3>Buy from Customer</h3>
       <input id="tcg-card-name" placeholder="Card Name (e.g., Charizard)">
       <button onclick="fetchTcgCard()">Fetch Card</button>
-      <select id="tcg-card-select" style="display: none;" onchange="selectTcgCard()">
-        <option value="">Select a card</option>
-      </select>
+      <div id="tcg-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
+        <div style="background: white; margin: 50px auto; padding: 20px; width: 80%; max-height: 80%; overflow-y: auto;">
+          <h4>Select a Card</h4>
+          <div id="tcg-card-list" style="display: flex; flex-wrap: wrap; gap: 20px;"></div>
+          <button onclick="closeTcgModal()">Close</button>
+        </div>
+      </div>
       <input id="buy-name" placeholder="Name">
       <input id="buy-type" placeholder="Type (e.g., pokemon_card)">
       <input id="buy-price" type="number" placeholder="Market Price">
@@ -234,29 +238,37 @@ function fetchTcgCard() {
   ipcRenderer.send('get-tcg-card', cardName);
   ipcRenderer.once('tcg-card-data', (event, cards) => {
     console.log('Received TCG card data:', cards);
-    const select = document.getElementById('tcg-card-select');
-    select.innerHTML = '<option value="">Select a card</option>'; // Reset options
+    const cardList = document.getElementById('tcg-card-list');
+    cardList.innerHTML = ''; // Clear previous cards
     cards.forEach(card => {
-      const option = document.createElement('option');
-      option.value = JSON.stringify(card); // Store full card data
-      option.text = `${card.name} (£${card.price.toFixed(2)})`;
-      select.appendChild(option);
+      const cardDiv = document.createElement('div');
+      cardDiv.style = 'border: 1px solid #ccc; padding: 10px; width: 200px; text-align: center;';
+      cardDiv.innerHTML = `
+        <img src="${card.image_url}" alt="${card.name}" style="width: 100%; max-height: 200px;">
+        <p><strong>${card.name}</strong></p>
+        <p>Set: ${card.set}</p>
+        <p>Rarity: ${card.rarity}</p>
+        <p>Price: £${card.price.toFixed(2)}</p>
+        <button onclick='selectTcgCard(${JSON.stringify(card)})'>Select</button>
+      `;
+      cardList.appendChild(cardDiv);
     });
-    select.style.display = 'block'; // Show dropdown
+    document.getElementById('tcg-modal').style.display = 'flex'; // Show modal
   });
   ipcRenderer.once('tcg-card-error', (event, error) => console.error('TCG card fetch failed:', error));
 }
 
-function selectTcgCard() {
-  const select = document.getElementById('tcg-card-select');
-  const selectedCard = JSON.parse(select.value || '{}');
-  if (selectedCard.name) {
-    console.log('Selected TCG card:', selectedCard);
-    document.getElementById('buy-name').value = selectedCard.name;
-    document.getElementById('buy-type').value = selectedCard.type;
-    document.getElementById('buy-price').value = selectedCard.price;
-    document.getElementById('buy-trade-value').value = Math.floor(selectedCard.price * 0.5);
-  }
+function selectTcgCard(card) {
+  console.log('Selected TCG card:', card);
+  document.getElementById('buy-name').value = card.name;
+  document.getElementById('buy-type').value = card.type;
+  document.getElementById('buy-price').value = card.price;
+  document.getElementById('buy-trade-value').value = Math.floor(card.price * 0.5);
+  closeTcgModal();
+}
+
+function closeTcgModal() {
+  document.getElementById('tcg-modal').style.display = 'none';
 }
 
 function completeBuyTransaction() {

@@ -129,7 +129,9 @@ ipcMain.on('get-tcg-card', async (event, cardName) => {
         type: row.type,
         price: row.price,
         image_url: row.image_url,
-        tcg_id: row.tcg_id
+        tcg_id: row.tcg_id,
+        set: row.set || 'Unknown', // Fallback if not cached
+        rarity: row.rarity || 'Unknown'
       }]);
       return;
     }
@@ -151,7 +153,9 @@ ipcMain.on('get-tcg-card', async (event, cardName) => {
         type: 'pokemon_card',
         price: card.tcgplayer?.prices?.holofoil?.market || card.tcgplayer?.prices?.normal?.market || 10,
         image_url: card.images.small,
-        tcg_id: card.id
+        tcg_id: card.id,
+        set: card.set.name, // Add set name
+        rarity: card.rarity || 'Unknown' // Add rarity
       }));
       console.log('Fetched TCG cards:', cards);
 
