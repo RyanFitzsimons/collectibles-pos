@@ -22,12 +22,12 @@ function showScreen(screen) {
     content.innerHTML = `
       <h3>Buy from Customer</h3>
       <input id="tcg-card-name" placeholder="Card Name (e.g., Charizard)">
-      <button onclick="fetchTcgCard()">Fetch Card</button>
-      <div id="tcg-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
+      <button onclick="fetchTcgCard('buy')">Fetch Card</button>
+      <div id="tcg-modal-buy" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
         <div style="background: white; margin: 50px auto; padding: 20px; width: 80%; max-height: 80%; overflow-y: auto;">
           <h4>Select a Card</h4>
-          <div id="tcg-card-list" style="display: flex; flex-wrap: wrap; gap: 20px;"></div>
-          <button onclick="closeTcgModal()">Close</button>
+          <div id="tcg-card-list-buy" style="display: flex; flex-wrap: wrap; gap: 20px;"></div>
+          <button onclick="closeTcgModal('buy')">Close</button>
         </div>
       </div>
       <input id="buy-name" placeholder="Name">
@@ -73,11 +73,34 @@ function showScreen(screen) {
         <h3>Trade with Customer</h3>
         <div>
           <h4>Add to Inventory (Trade-In)</h4>
+          <input id="trade-in-tcg-card-name" placeholder="Card Name (e.g., Charizard)">
+          <button onclick="fetchTcgCard('trade-in')">Fetch Card</button>
+          <div id="tcg-modal-trade-in" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
+            <div style="background: white; margin: 50px auto; padding: 20px; width: 80%; max-height: 80%; overflow-y: auto;">
+              <h4>Select a Card</h4>
+              <div id="tcg-card-list-trade-in" style="display: flex; flex-wrap: wrap; gap: 20px;"></div>
+              <button onclick="closeTcgModal('trade-in')">Close</button>
+            </div>
+          </div>
           <input id="trade-in-name" placeholder="Name">
           <input id="trade-in-type" placeholder="Type (e.g., pokemon_card)">
           <input id="trade-in-price" type="number" placeholder="Market Price">
           <input id="trade-in-value" type="number" placeholder="Trade Value">
+          <select id="trade-in-condition-category">
+            <option value="">Select Category</option>
+            <option value="Raw">Raw</option>
+            <option value="PSA">PSA</option>
+            <option value="CGC">CGC</option>
+            <option value="BGS">BGS</option>
+            <option value="TAG">TAG</option>
+            <option value="Other">Other</option>
+          </select>
+          <input id="trade-in-condition-value" type="text" placeholder="Condition/Grade (e.g., NM, 7)">
           <input id="trade-in-image" type="file" accept="image/*">
+          <input id="trade-in-tcg-id" type="hidden">
+          <input id="trade-in-card-set" type="hidden">
+          <input id="trade-in-rarity" type="hidden">
+          <input id="trade-in-image-url" type="hidden">
           <button onclick="addToTradeInCart()">Add Trade-In</button>
         </div>
         <div>
@@ -265,17 +288,17 @@ function addToBuy() {
   ipcRenderer.once('add-item-error', (event, error) => console.error('Add item failed:', error));
 }
 
-function fetchTcgCard() {
-  const cardName = document.getElementById('tcg-card-name').value;
+function fetchTcgCard(context) {
+  const cardName = document.getElementById(`${context}-tcg-card-name`).value;
   if (!cardName) {
-    console.error('No card name provided');
+    console.error('No card name provided for', context);
     return;
   }
-  console.log('Fetching TCG card:', cardName);
+  console.log(`Fetching TCG card for ${context}:`, cardName);
   ipcRenderer.send('get-tcg-card', cardName);
   ipcRenderer.once('tcg-card-data', (event, cards) => {
-    console.log('Received TCG card data:', cards);
-    const cardList = document.getElementById('tcg-card-list');
+    console.log(`Received TCG card data for ${context}:`, cards);
+    const cardList = document.getElementById(`tcg-card-list-${context}`);
     cardList.innerHTML = '';
     cards.forEach(card => {
       const cardDiv = document.createElement('div');
@@ -286,33 +309,33 @@ function fetchTcgCard() {
         <p>Set: ${card.card_set}</p>
         <p>Rarity: ${card.rarity}</p>
         <p>Price: £${card.price.toFixed(2)}</p>
-        <button onclick='selectTcgCard(${JSON.stringify(card)})'>Select</button>
+        <button onclick='selectTcgCard(${JSON.stringify(card)}, "${context}")'>Select</button>
       `;
       cardList.appendChild(cardDiv);
     });
-    document.getElementById('tcg-modal').style.display = 'flex';
+    document.getElementById(`tcg-modal-${context}`).style.display = 'flex';
   });
-  ipcRenderer.once('tcg-card-error', (event, error) => console.error('TCG card fetch failed:', error));
+  ipcRenderer.once('tcg-card-error', (event, error) => console.error(`TCG card fetch failed for ${context}:`, error));
 }
 
-function selectTcgCard(card) {
-  console.log('Selected TCG card:', card);
-  document.getElementById('buy-name').value = card.name;
-  document.getElementById('buy-type').value = card.type;
-  document.getElementById('buy-price').value = card.price;
-  document.getElementById('buy-trade-value').value = Math.floor(card.price * 0.5);
-  document.getElementById('buy-condition-category').value = '';
-  document.getElementById('buy-condition-value').value = '';
-  document.getElementById('buy-tcg-id').value = card.tcg_id;
-  document.getElementById('buy-card-set').value = card.card_set;
-  document.getElementById('buy-rarity').value = card.rarity;
-  document.getElementById('buy-image-url').value = card.image_url;
+function selectTcgCard(card, context) {
+  console.log(`Selected TCG card for ${context}:`, card);
+  document.getElementById(`${context}-name`).value = card.name;
+  document.getElementById(`${context}-type`).value = card.type;
+  document.getElementById(`${context}-price`).value = card.price;
+  document.getElementById(`${context}-value`).value = Math.floor(card.price * 0.5);
+  document.getElementById(`${context}-condition-category`).value = '';
+  document.getElementById(`${context}-condition-value`).value = '';
+  document.getElementById(`${context}-tcg-id`).value = card.tcg_id;
+  document.getElementById(`${context}-card-set`).value = card.card_set;
+  document.getElementById(`${context}-rarity`).value = card.rarity;
+  document.getElementById(`${context}-image-url`).value = card.image_url;
 
-  closeTcgModal();
+  closeTcgModal(context);
 }
 
-function closeTcgModal() {
-  document.getElementById('tcg-modal').style.display = 'none';
+function closeTcgModal(context) {
+  document.getElementById(`tcg-modal-${context}`).style.display = 'none';
 }
 
 function completeBuyTransaction() {
@@ -346,11 +369,32 @@ function addToTradeInCart() {
   const type = document.getElementById('trade-in-type').value;
   const price = parseFloat(document.getElementById('trade-in-price').value) || 0;
   const tradeValue = parseFloat(document.getElementById('trade-in-value').value) || 0;
+  const conditionCategory = document.getElementById('trade-in-condition-category').value || '';
+  const conditionValue = document.getElementById('trade-in-condition-value').value || '';
+  const condition = conditionCategory && conditionValue ? `${conditionCategory} - ${conditionValue}` : null;
   const image = document.getElementById('trade-in-image').files[0];
   const id = Date.now().toString();
+  const tcg_id = document.getElementById('trade-in-tcg-id').value || null;
+  const card_set = document.getElementById('trade-in-card-set').value || null;
+  const rarity = document.getElementById('trade-in-rarity').value || null;
+  const image_url = document.getElementById('trade-in-image-url').value || null;
 
-  console.log('Adding to trade-in cart:', { id, name, type, price, tradeValue, image: image ? image.name : null });
-  ipcRenderer.send('add-item', { id, name, type, price, tradeValue, imagePath: image ? image.path : null, imageName: image ? image.name : null, role: 'trade_in' });
+  console.log('Adding to trade-in cart:', { id, name, type, price, tradeValue, condition, image: image ? image.name : null, tcg_id, card_set, rarity, image_url });
+  ipcRenderer.send('add-item', {
+    id,
+    name,
+    type,
+    price,
+    tradeValue,
+    condition,
+    imagePath: image ? image.path : null,
+    imageName: image ? image.name : null,
+    image_url,
+    role: 'trade_in',
+    tcg_id,
+    card_set,
+    rarity
+  });
   ipcRenderer.once('add-item-success', (event, item) => {
     tradeInCart.push(item);
     showScreen('trade');
