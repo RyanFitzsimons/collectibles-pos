@@ -315,3 +315,37 @@
     width: 100%;
     max-width: 400px;
   }
+
+  .transactions-table + .pagination {
+    margin-top: 15px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  
+  .transactions-table + .pagination button {
+    background-color: #7289DA;
+    color: #FFFFFF;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  
+  .transactions-table + .pagination button:hover {
+    background-color: #5B6EAE;
+  }
+  
+  .transactions-table + .pagination button:disabled {
+    background-color: #4B5EAA;
+    cursor: not-allowed;
+  }
+  
+  .transactions-table + .input-group input[type="date"] {
+    background-color: #2C2F33;
+    color: #DCDDDE;
+    border: 1px solid #40444B;
+    padding: 8px;
+    border-radius: 4px;
+    width: 150px;
+  }

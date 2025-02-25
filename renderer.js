@@ -30,9 +30,6 @@ function cleanPrice(price) {
   return `\u00A3${cleaned}`; // Unicode £
 }
 
-javascript
-Wrap
-Copy
 function showScreen(screen) {
   console.log('Showing screen:', screen, { sellCart, tradeInCart, tradeOutCart, buyItems });
   const content = document.getElementById('content');
@@ -139,10 +136,17 @@ function showScreen(screen) {
       let currentSortKey = 'timestamp';
       let isAsc = false;
       let searchTerm = '';
+      let startDate = '';
+      let endDate = '';
+      let currentPage = 1;
+      const itemsPerPage = 10;
 
       function renderTransactions(filteredTransactions) {
         const totalCashIn = filteredTransactions.reduce((sum, [, tx]) => sum + (parseFloat(tx.cash_in) || 0), 0);
         const totalCashOut = filteredTransactions.reduce((sum, [, tx]) => sum + (parseFloat(tx.cash_out) || 0), 0);
+        const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const paginatedTransactions = filteredTransactions.slice(startIndex, startIndex + itemsPerPage);
 
         content.innerHTML = `
           <div class="section">
@@ -151,8 +155,15 @@ function showScreen(screen) {
               <label>Filter Transactions</label>
               <input id="transactions-search" type="text" placeholder="Search by ID, Type, or Item Name" value="${searchTerm}">
             </div>
+            <div class="input-group">
+              <label>Start Date</label>
+              <input id="transactions-start-date" type="date" value="${startDate}">
+              <label>End Date</label>
+              <input id="transactions-end-date" type="date" value="${endDate}">
+            </div>
             <p>Total Cash In: ${cleanPrice(totalCashIn.toFixed(2))}</p>
             <p>Total Cash Out: ${cleanPrice(totalCashOut.toFixed(2))}</p>
+            <button id="export-csv">Export to CSV</button>
             <table class="transactions-table">
               <thead>
                 <tr>
@@ -165,7 +176,7 @@ function showScreen(screen) {
                 </tr>
               </thead>
               <tbody>
-                ${filteredTransactions.map(([id, tx]) => `
+                ${paginatedTransactions.map(([id, tx]) => `
                   <tr>
                     <td>${id}</td>
                     <td>${tx.type}</td>
@@ -188,6 +199,11 @@ function showScreen(screen) {
                 `).join('')}
               </tbody>
             </table>
+            <div class="pagination">
+              <button id="prev-page" ${currentPage === 1 ? 'disabled' : ''}>Previous</button>
+              <span>Page ${currentPage} of ${totalPages}</span>
+              <button id="next-page" ${currentPage >= totalPages ? 'disabled' : ''}>Next</button>
+            </div>
           </div>
         `;
 
@@ -215,21 +231,50 @@ function showScreen(screen) {
         // Debounced Filtering
         document.getElementById('transactions-search').addEventListener('input', debounce((e) => {
           searchTerm = e.target.value.toLowerCase();
-          const filtered = allTransactions.filter(([id, tx]) => {
-            const itemNames = tx.items.map(item => item.name.toLowerCase()).join(' ');
-            return (
-              id.toLowerCase().includes(searchTerm) ||
-              tx.type.toLowerCase().includes(searchTerm) ||
-              itemNames.includes(searchTerm)
-            );
-          });
-          sortedTransactions = filtered.sort((a, b) => {
-            const aVal = currentSortKey === 'timestamp' ? new Date(a[1][currentSortKey]) : (a[1][currentSortKey] || 0);
-            const bVal = currentSortKey === 'timestamp' ? new Date(b[1][currentSortKey]) : (b[1][currentSortKey] || 0);
-            return isAsc ? aVal - bVal : bVal - aVal;
-          });
-          renderTransactions(sortedTransactions);
+          applyFilters();
         }, 600));
+
+        // Date Range Filtering
+        document.getElementById('transactions-start-date').addEventListener('change', (e) => {
+          startDate = e.target.value;
+          applyFilters();
+        });
+        document.getElementById('transactions-end-date').addEventListener('change', (e) => {
+          endDate = e.target.value;
+          applyFilters();
+        });
+
+        // Pagination
+        document.getElementById('prev-page').addEventListener('click', () => {
+          if (currentPage > 1) {
+            currentPage--;
+            renderTransactions(sortedTransactions);
+          }
+        });
+        document.getElementById('next-page').addEventListener('click', () => {
+          if (currentPage < totalPages) {
+            currentPage++;
+            renderTransactions(sortedTransactions);
+          }
+        });
+
+        // Export to CSV
+        document.getElementById('export-csv').addEventListener('click', () => {
+          let csvContent = 'ID,Type,Cash In,Cash Out,Timestamp,Items\n';
+          filteredTransactions.forEach(([id, tx]) => {
+            const itemsStr = tx.items.map(item => 
+              `${item.name} (${item.card_set || 'Unknown Set'}) (${item.condition || 'Not Set'}) (${item.role === 'trade_in' ? 'Trade-In' : item.role === 'trade_out' ? 'Trade-Out' : 'Sold'}) - ${item.role === 'trade_in' ? cleanPrice(item.trade_value) : cleanPrice(item.negotiated_price || item.original_price)}`
+            ).join('; ');
+            csvContent += `${id},${tx.type},${cleanPrice(tx.cash_in || 0)},${cleanPrice(tx.cash_out || 0)},${tx.timestamp},"${itemsStr.replace(/"/g, '""')}"\n`;
+          });
+          const blob = new Blob([csvContent], { type: 'text/csv' });
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `transactions_${new Date().toISOString().split('T')[0]}.csv`;
+          a.click();
+          window.URL.revokeObjectURL(url);
+        });
 
         // Toggle items
         function bindToggleEvents() {
@@ -244,6 +289,34 @@ function showScreen(screen) {
           });
         }
         bindToggleEvents();
+
+        // Apply all filters
+        function applyFilters() {
+          let filtered = allTransactions;
+          if (searchTerm) {
+            filtered = filtered.filter(([id, tx]) => {
+              const itemNames = tx.items.map(item => item.name.toLowerCase()).join(' ');
+              return (
+                id.toLowerCase().includes(searchTerm) ||
+                tx.type.toLowerCase().includes(searchTerm) ||
+                itemNames.includes(searchTerm)
+              );
+            });
+          }
+          if (startDate) {
+            filtered = filtered.filter(([, tx]) => new Date(tx.timestamp) >= new Date(startDate));
+          }
+          if (endDate) {
+            filtered = filtered.filter(([, tx]) => new Date(tx.timestamp) <= new Date(endDate));
+          }
+          sortedTransactions = filtered.sort((a, b) => {
+            const aVal = currentSortKey === 'timestamp' ? new Date(a[1][currentSortKey]) : (a[1][currentSortKey] || 0);
+            const bVal = currentSortKey === 'timestamp' ? new Date(b[1][currentSortKey]) : (b[1][currentSortKey] || 0);
+            return isAsc ? aVal - bVal : bVal - aVal;
+          });
+          currentPage = 1; // Reset to first page on filter
+          renderTransactions(sortedTransactions);
+        }
       }
 
       renderTransactions(sortedTransactions);
