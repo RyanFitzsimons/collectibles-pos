@@ -44,11 +44,11 @@ function generateItem(index) {
   const set = sets[Math.floor(Math.random() * sets.length)];
   const rarity = rarities[Math.floor(Math.random() * rarities.length)];
   const condition = conditions[Math.floor(Math.random() * conditions.length)];
-  const price = (Math.random() * 100 + 1).toFixed(2); // $1-$100
+  const price = parseFloat((Math.random() * 100 + 1).toFixed(2)); // Clean number
   const stock = Math.floor(Math.random() * 10) + 1; // 1-10
   const tcg_id = `${set.toLowerCase().replace(' ', '-')}-${index}`;
   const id = `${Date.now()}-${index}`;
-  const image_url = `file://${path.join(__dirname, 'images', `${tcg_id}.png`)}`; // Mock local path
+  const image_url = `file://${path.join(__dirname, 'images', `${tcg_id}.png`)}`;
   
   return { id, type: 'pokemon_card', name, price, stock, image_url, tcg_id, card_set: set, rarity, condition };
 }

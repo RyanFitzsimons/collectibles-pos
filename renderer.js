@@ -22,6 +22,14 @@ function debounce(func, wait) {
   };
 }
 
+// Enhanced cleanPrice with explicit £
+function cleanPrice(price) {
+  const raw = String(price);
+  const cleaned = raw.replace(/[^0-9.]/g, ''); // Only numbers and decimals
+  console.log(`Cleaning price: "${raw}" -> "${cleaned}"`); // Debug log
+  return `\u00A3${cleaned}`; // Unicode £
+}
+
 function showScreen(screen) {
   console.log('Showing screen:', screen, { sellCart, tradeInCart, tradeOutCart, buyItems });
   const content = document.getElementById('content');
@@ -29,13 +37,13 @@ function showScreen(screen) {
   if (screen === 'sell') {
     fetchInventory('sell', sellPage, sellSearchTerm);
   } else if (screen === 'buy') {
-    const totalPayout = buyItems.reduce((sum, item) => sum + item.tradeValue, 0);
+    const totalPayout = buyItems.reduce((sum, item) => sum + parseFloat(item.tradeValue), 0);
     content.innerHTML = `
       <div class="section">
         <h3>Add Item</h3>
         <div class="input-group">
           <label>Search TCG Card</label>
-          <input id="tcg-card-name" placeholder="e.g., Charizard" type="text">
+          <input id="buy-tcg-card-name" placeholder="e.g., Charizard" type="text">
           <button onclick="fetchTcgCard('buy')">Fetch Card</button>
         </div>
         <div id="tcg-modal-buy" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
@@ -54,11 +62,11 @@ function showScreen(screen) {
           <input id="buy-type" placeholder="e.g., pokemon_card" type="text">
         </div>
         <div class="input-group">
-          <label>Market Price (£)</label>
+          <label>Market Price (\u00A3)</label>
           <input id="buy-price" placeholder="Enter price" type="number">
         </div>
         <div class="input-group">
-          <label>Trade Value (£)</label>
+          <label>Trade Value (\u00A3)</label>
           <input id="buy-trade-value" placeholder="Enter trade value" type="number">
         </div>
         <div class="input-group">
@@ -90,11 +98,11 @@ function showScreen(screen) {
           ${buyItems.map(item => `
             <li>
               ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}" style="max-width: 50px;">` : ''}
-              ${item.name} (${item.card_set || 'Unknown Set'}) - £${item.tradeValue} (${item.condition || 'Not Set'})
+              ${item.name} (${item.card_set || 'Unknown Set'}) - ${cleanPrice(item.tradeValue)} (${item.condition || 'Not Set'})
             </li>
           `).join('')}
         </ul>
-        <p>Total Payout: £${totalPayout.toFixed(2)}</p>
+        <p>Total Payout: ${cleanPrice(totalPayout.toFixed(2))}</p>
         <button onclick="completeBuyTransaction()">Complete Buy</button>
       </div>
     `;
@@ -102,13 +110,53 @@ function showScreen(screen) {
     fetchInventory('trade-out', tradeOutPage, tradeOutSearchTerm);
   } else if (screen === 'transactions') {
     ipcRenderer.send('get-transactions');
+    ipcRenderer.once('transactions-data', (event, rows) => {
+      const transactions = {};
+      rows.forEach(row => {
+        if (!transactions[row.id]) {
+          transactions[row.id] = { type: row.type, cash_in: row.cash_in, cash_out: row.cash_out, timestamp: row.timestamp, items: [] };
+        }
+        if (row.item_id) {
+          transactions[row.id].items.push({
+            item_id: row.item_id,
+            name: row.item_name,
+            role: row.role,
+            trade_value: row.trade_value,
+            negotiated_price: row.negotiated_price,
+            original_price: row.original_price,
+            image_url: row.image_url,
+            condition: row.condition,
+            card_set: row.card_set
+          });
+        }
+      });
+      content.innerHTML = `
+        <h3>Transactions</h3>
+        <ul>
+          ${Object.entries(transactions).map(([id, tx]) => `
+            <li>
+              ID: ${id}, Type: ${tx.type}, Cash In: ${cleanPrice(tx.cash_in || 0)}, Cash Out: ${cleanPrice(tx.cash_out || 0)}, Time: ${tx.timestamp}
+              <ul>
+                ${tx.items.map(item => `
+                  <li>
+                    ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}">` : ''}
+                    ${item.name} (${item.card_set || 'Unknown Set'}) (${item.condition || 'Not Set'}) (${item.role === 'trade_in' ? 'Trade-In' : item.role === 'trade_out' ? 'Trade-Out' : 'Sold'}) - 
+                    ${item.role === 'trade_in' ? `Trade Value: ${cleanPrice(item.trade_value)}` : `Sold For: ${cleanPrice(item.negotiated_price || item.original_price)}`}
+                  </li>
+                `).join('')}
+              </ul>
+            </li>
+          `).join('')}
+        </ul>
+      `;
+    });
   }
 }
 
 function renderSellTab(inventory, total) {
   console.log('Rendering Sell tab with:', { inventory, total });
-  const totalListed = sellCart.reduce((sum, item) => sum + item.price, 0);
-  const totalNegotiated = sellCart.reduce((sum, item) => sum + (item.negotiatedPrice || item.price), 0);
+  const totalListed = sellCart.reduce((sum, item) => sum + parseFloat(item.price), 0);
+  const totalNegotiated = sellCart.reduce((sum, item) => sum + parseFloat(item.negotiatedPrice || item.price), 0);
   const totalPages = Math.ceil(total / itemsPerPage);
   document.getElementById('content').innerHTML = `
     <h3>Sell to Customer</h3>
@@ -119,7 +167,7 @@ function renderSellTab(inventory, total) {
         ${inventory.map(item => `
           <li>
             ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}">` : ''}
-            ${item.name} (${item.card_set || 'Unknown Set'}) - £${item.price} (${item.condition || 'Not Set'}) <button onclick="addToSellCart('${item.id}', '${item.name}', ${item.price}, '${item.image_url || ''}', '${item.card_set || ''}', '${item.condition || ''}')">Add</button>
+            ${item.name} (${item.card_set || 'Unknown Set'}) - ${cleanPrice(item.price)} (${item.condition || 'Not Set'}) <button onclick="addToSellCart('${item.id}', '${item.name}', ${item.price}, '${item.image_url || ''}', '${item.card_set || ''}', '${item.condition || ''}')">Add</button>
           </li>
         `).join('')}
       </ul>
@@ -137,24 +185,24 @@ function renderSellTab(inventory, total) {
             ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}" style="max-width: 50px;">` : ''}
             ${item.name} (${item.card_set || 'Unknown Set'}) - 
             <input type="number" value="${item.negotiatedPrice}" onchange="updateSellPrice('${item.id}', this.value)" style="width: 60px;">
-            (Original: £${item.price}, ${item.condition || 'Not Set'})
+            (Original: ${cleanPrice(item.price)}, ${item.condition || 'Not Set'})
           </li>
         `).join('')}
       </ul>
-      <p>Total Listed: £${totalListed.toFixed(2)}</p>
-      <p>Total Negotiated: £${totalNegotiated.toFixed(2)}</p>
+      <p>Total Listed: ${cleanPrice(totalListed.toFixed(2))}</p>
+      <p>Total Negotiated: ${cleanPrice(totalNegotiated.toFixed(2))}</p>
       <button onclick="completeSellTransaction()">Complete Sell</button>
     </div>
   `;
   document.getElementById('sell-search').addEventListener('input', debounce((e) => {
     sellSearchTerm = e.target.value;
-    fetchInventory('sell', 1, sellSearchTerm); // Reset to page 1 on search
+    fetchInventory('sell', 1, sellSearchTerm);
   }, 600));
 }
 
 function renderTradeTab(inventory, total) {
-  const tradeInTotal = tradeInCart.reduce((sum, item) => sum + item.tradeValue, 0);
-  const tradeOutTotal = tradeOutCart.reduce((sum, item) => sum + (item.negotiatedPrice || item.price), 0);
+  const tradeInTotal = tradeInCart.reduce((sum, item) => sum + parseFloat(item.tradeValue), 0);
+  const tradeOutTotal = tradeOutCart.reduce((sum, item) => sum + parseFloat(item.negotiatedPrice || item.price), 0);
   const cashDue = Math.max(tradeOutTotal - tradeInTotal, 0);
   const cashBack = tradeInTotal > tradeOutTotal ? tradeInTotal - tradeOutTotal : 0;
   const totalPages = Math.ceil(total / itemsPerPage);
@@ -185,11 +233,11 @@ function renderTradeTab(inventory, total) {
             <input id="trade-in-type" placeholder="e.g., pokemon_card" type="text">
           </div>
           <div class="input-group">
-            <label>Market Price (£)</label>
+            <label>Market Price (\u00A3)</label>
             <input id="trade-in-price" placeholder="Enter price" type="number">
           </div>
           <div class="input-group">
-            <label>Trade Value (£)</label>
+            <label>Trade Value (\u00A3)</label>
             <input id="trade-in-value" placeholder="Enter trade value" type="number">
           </div>
           <div class="input-group">
@@ -221,11 +269,11 @@ function renderTradeTab(inventory, total) {
             ${tradeInCart.map(item => `
               <li>
                 ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}" style="max-width: 50px;">` : ''}
-                ${item.name} (${item.card_set || 'Unknown Set'}) - £${item.tradeValue} (${item.condition || 'Not Set'})
+                ${item.name} (${item.card_set || 'Unknown Set'}) - ${cleanPrice(item.tradeValue)} (${item.condition || 'Not Set'})
               </li>
             `).join('')}
           </ul>
-          <p>Total Trade-In Value: £${tradeInTotal.toFixed(2)}</p>
+          <p>Total Trade-In Value: ${cleanPrice(tradeInTotal.toFixed(2))}</p>
         </div>
       </div>
       <div class="trade-section trade-out">
@@ -236,7 +284,7 @@ function renderTradeTab(inventory, total) {
             ${inventory.map(item => `
               <li>
                 ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}">` : ''}
-                ${item.name} (${item.card_set || 'Unknown Set'}) - £${item.price} (${item.condition || 'Not Set'}) <button onclick="addToTradeOutCart('${item.id}', '${item.name}', ${item.price}, '${item.image_url || ''}', '${item.card_set || ''}', '${item.condition || ''}')">Add</button>
+                ${item.name} (${item.card_set || 'Unknown Set'}) - ${cleanPrice(item.price)} (${item.condition || 'Not Set'}) <button onclick="addToTradeOutCart('${item.id}', '${item.name}', ${item.price}, '${item.image_url || ''}', '${item.card_set || ''}', '${item.condition || ''}')">Add</button>
               </li>
             `).join('')}
           </ul>
@@ -254,13 +302,13 @@ function renderTradeTab(inventory, total) {
                 ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}" style="max-width: 50px;">` : ''}
                 ${item.name} (${item.card_set || 'Unknown Set'}) - 
                 <input type="number" value="${item.negotiatedPrice}" onchange="updateTradeOutPrice('${item.id}', this.value)" style="width: 60px;">
-                (Original: £${item.price}, ${item.condition || 'Not Set'})
+                (Original: ${cleanPrice(item.price)}, ${item.condition || 'Not Set'})
               </li>
             `).join('')}
           </ul>
-          <p>Total Trade-Out Value: £${tradeOutTotal.toFixed(2)}</p>
-          <p>Cash Due: £${cashDue.toFixed(2)}</p>
-          ${cashBack > 0 ? `<p>Cash Back: £${cashBack.toFixed(2)}</p>` : ''}
+          <p>Total Trade-Out Value: ${cleanPrice(tradeOutTotal.toFixed(2))}</p>
+          <p>Cash Due: ${cleanPrice(cashDue.toFixed(2))}</p>
+          ${cashBack > 0 ? `<p>Cash Back: ${cleanPrice(cashBack.toFixed(2))}</p>` : ''}
           <button onclick="completeTradeTransaction()">Complete Trade</button>
         </div>
       </div>
@@ -354,7 +402,12 @@ function addToBuy() {
 }
 
 function fetchTcgCard(context) {
-  const cardName = document.getElementById(`${context}-tcg-card-name`).value;
+  const input = document.getElementById(`${context}-tcg-card-name`); // Fixed selector
+  if (!input) {
+    console.error(`No input found for context: ${context}`);
+    return;
+  }
+  const cardName = input.value;
   if (!cardName) {
     console.error('No card name provided for', context);
     return;
@@ -373,7 +426,7 @@ function fetchTcgCard(context) {
         <p><strong>${card.name}</strong></p>
         <p>Set: ${card.card_set}</p>
         <p>Rarity: ${card.rarity}</p>
-        <p>Price: £${card.price.toFixed(2)}</p>
+        <p>Price: ${cleanPrice(card.price.toFixed(2))}</p>
         <button onclick='selectTcgCard(${JSON.stringify(card)}, "${context}")'>Select</button>
       `;
       cardList.appendChild(cardDiv);
