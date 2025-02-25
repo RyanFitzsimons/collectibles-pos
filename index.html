@@ -2,16 +2,19 @@
 <html>
 <head>
   <title>Collectibles POS</title>
-    <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <nav>
+  <div class="sidebar">
+    <h2>POS</h2>
     <button onclick="showScreen('sell')">Sell</button>
     <button onclick="showScreen('buy')">Buy</button>
     <button onclick="showScreen('trade')">Trade</button>
     <button onclick="showScreen('transactions')">Transactions</button>
-  </nav>
-  <div id="content"></div>
-  <script src="./renderer.js"></script>
+  </div>
+  <div class="main-content">
+    <div id="content"></div>
+  </div>
+  <script src="renderer.js"></script>
 </body>
 </html>

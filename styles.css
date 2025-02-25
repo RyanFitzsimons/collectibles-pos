@@ -6,48 +6,96 @@
   }
   
   body {
-    background-color: #2C2F33; /* Dark gray */
-    color: #E0E0E0; /* Light text */
-    font-family: Arial, sans-serif;
-    font-size: 16px;
+    background-color: #1E2124; /* Darker gray */
+    color: #DCDDDE; /* Soft white */
+    font-family: 'Segoe UI', Arial, sans-serif;
+    font-size: 14px;
+    display: flex;
+  }
+  
+  /* Sidebar */
+  .sidebar {
+    width: 200px;
+    background-color: #2C2F33;
     padding: 20px;
+    height: 100vh;
+    position: fixed;
+    border-right: 1px solid #40444B;
+  }
+  
+  .sidebar h2 {
+    color: #FFFFFF;
+    font-size: 24px;
+    margin-bottom: 30px;
+  }
+  
+  .sidebar button {
+    display: block;
+    width: 100%;
+    background-color: #7289DA;
+    color: #FFFFFF;
+    border: none;
+    padding: 12px;
+    margin: 10px 0;
+    border-radius: 6px;
+    cursor: pointer;
+    text-align: left;
+    transition: background-color 0.2s;
+  }
+  
+  .sidebar button:hover {
+    background-color: #5B6EAE;
+  }
+  
+  /* Main Content */
+  .main-content {
+    margin-left: 200px;
+    padding: 20px;
+    flex-grow: 1;
   }
   
   /* Headings */
   h3, h4 {
-    color: #FFFFFF; /* White for headings */
-    margin-bottom: 10px;
+    color: #FFFFFF;
+    margin-bottom: 15px;
   }
   
   /* Inputs and Selects */
   input[type="text"], input[type="number"], select {
-    background-color: #23272A; /* Darker gray */
-    color: #E0E0E0;
+    background-color: #2C2F33;
+    color: #DCDDDE;
     border: 1px solid #40444B;
-    padding: 8px;
+    padding: 10px;
     margin: 5px 0;
     border-radius: 4px;
-    width: 200px;
+    width: 250px;
   }
   
   input[type="file"] {
-    color: #E0E0E0;
+    color: #DCDDDE;
+  }
+  
+  /* Search Bar */
+  input[type="text"][id$="-search"] {
+    width: 400px;
+    padding-left: 35px;
+    background: #2C2F33 url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="%23DCDDDE" viewBox="0 0 16 16"><path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/></svg>') no-repeat 10px center;
   }
   
   /* Buttons */
   button {
-    background-color: #7289DA; /* Accent blue */
+    background-color: #7289DA;
     color: #FFFFFF;
     border: none;
-    padding: 8px 16px;
+    padding: 10px 20px;
     margin: 5px 0;
-    border-radius: 4px;
+    border-radius: 6px;
     cursor: pointer;
     transition: background-color 0.2s;
   }
   
   button:hover {
-    background-color: #5B6EAE; /* Darker blue on hover */
+    background-color: #5B6EAE;
   }
   
   button:disabled {
@@ -62,34 +110,36 @@
   }
   
   ul li {
-    background-color: #35393F; /* Slightly lighter dark */
-    padding: 10px;
-    margin: 5px 0;
-    border-radius: 4px;
+    background-color: #35393F;
+    padding: 15px;
+    margin: 8px 0;
+    border-radius: 6px;
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 15px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
   }
   
   ul li img {
-    max-width: 50px;
+    max-width: 60px;
     border-radius: 4px;
   }
   
   ul li:hover {
-    background-color: #40444B; /* Hover effect */
+    background-color: #40444B;
   }
   
   /* Modal */
   div[style*="position: fixed"] {
-    background: rgba(0, 0, 0, 0.8) !important; /* Darker overlay */
+    background: rgba(0, 0, 0, 0.85) !important;
   }
   
   div[style*="background: white"] {
-    background-color: #2C2F33 !important; /* Modal content */
+    background-color: #2C2F33 !important;
     border: 1px solid #40444B;
     border-radius: 8px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+    max-width: 90%;
   }
   
   div[style*="display: flex"] {
@@ -97,14 +147,14 @@
     gap: 20px;
   }
   
-  /* Specific Modal Card */
+  /* Modal Card */
   #tcg-card-list-buy div, #tcg-card-list-trade-in div {
     background-color: #35393F;
     border: 1px solid #40444B;
-    padding: 10px;
-    border-radius: 4px;
+    padding: 15px;
+    border-radius: 6px;
     text-align: center;
-    width: 200px;
+    width: 220px;
   }
   
   #tcg-card-list-buy div:hover, #tcg-card-list-trade-in div:hover {
@@ -113,16 +163,18 @@
   
   /* Pagination */
   div[style*="button"] {
-    margin-top: 10px;
+    margin-top: 15px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
   }
   
   span {
-    color: #E0E0E0;
-    margin: 0 10px;
+    color: #DCDDDE;
   }
   
   /* Text */
   p {
-    color: #D4D4D4; /* Slightly dimmer text */
+    color: #BABDCA; /* Softer gray */
     margin: 5px 0;
   }
