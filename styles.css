@@ -245,3 +245,57 @@
     width: 100%;
     max-width: 400px;
   }
+
+  /* Transactions Table */
+.transactions-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 15px;
+    background-color: #35393F;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  
+  .transactions-table th,
+  .transactions-table td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid #40444B;
+  }
+  
+  .transactions-table th {
+    background-color: #2C2F33;
+    color: #FFFFFF;
+    cursor: pointer;
+    user-select: none;
+  }
+  
+  .transactions-table th.asc::after {
+    content: ' ↑';
+  }
+  
+  .transactions-table th:not(.asc)::after {
+    content: ' ↓';
+  }
+  
+  .transactions-table tr:hover {
+    background-color: #40444B;
+  }
+  
+  .transactions-table .items-list {
+    margin: 10px 0 0 20px;
+    padding: 0;
+  }
+  
+  .transactions-table .toggle-items {
+    background-color: #7289DA;
+    color: #FFFFFF;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+  
+  .transactions-table .toggle-items:hover {
+    background-color: #5B6EAE;
+  }
