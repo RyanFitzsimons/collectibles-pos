@@ -3,6 +3,7 @@ const { app, BrowserWindow, ipcMain, net } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const sqlite3 = require('sqlite3').verbose();
+const axios = require('axios'); // Add this
 
 const dbPath = path.join(__dirname, 'inventory.db');
 const db = new sqlite3.Database(dbPath, (err) => {
@@ -198,70 +199,50 @@ ipcMain.on('get-transactions', (event) => {
   });
 });
 
-ipcMain.on('get-tcg-card', async (event, cardName) => {
-  db.get('SELECT * FROM collectibles WHERE name = ? AND tcg_id IS NOT NULL', [cardName], async (err, row) => {
-    if (err) {
-      console.error('DB query error:', err);
-      event.reply('tcg-card-error', err.message);
-      return;
-    }
-    if (row) {
-      console.log('Found cached TCG card:', row);
-      event.reply('tcg-card-data', [{
-        name: row.name,
-        type: row.type,
-        price: row.price,
-        image_url: row.image_url,
-        tcg_id: row.tcg_id,
-        card_set: row.card_set || 'Unknown',
-        rarity: row.rarity || 'Unknown',
-        condition: row.condition || 'Not Set'
-      }]);
-      return;
-    }
+ipcMain.on('get-tcg-card', (event, cardName) => {
+  console.log('Fetching TCG card:', cardName);
+  const options = {
+    method: 'GET',
+    url: 'https://api.pokemontcg.io/v2/cards',
+    headers: { 'X-Api-Key': process.env.TCG_API_KEY || 'your-api-key-here' },
+    params: { q: `name:${cardName}` }
+  };
 
-    try {
-      const url = `https://api.pokemontcg.io/v2/cards?q=name:*${encodeURIComponent(cardName.toLowerCase())}*`;
-      console.log('Fetching from URL:', url);
-      const response = await new Promise((resolve, reject) => {
-        const request = net.request(url);
-        request.setHeader('X-Api-Key', process.env.POKEMONTCG_API_KEY);
-        request.on('response', resolve);
-        request.on('error', reject);
-        request.end();
-      });
-      const result = await new Promise((resolve, reject) => {
-        const chunks = [];
-        response.on('data', (chunk) => chunks.push(chunk));
-        response.on('end', () => resolve(JSON.parse(Buffer.concat(chunks).toString())));
-        response.on('error', reject);
-      });
-      console.log('API response:', result);
-      if (!result.data || result.data.length === 0) throw new Error('No cards found');
-      
-      const cards = result.data.map(card => ({
-        name: card.name,
-        type: 'pokemon_card',
-        price: card.tcgplayer?.prices?.holofoil?.market || card.tcgplayer?.prices?.normal?.market || 10,
-        image_url: card.images.small,
+  axios.request(options)
+    .then(response => {
+      const cards = response.data.data.map(card => ({
         tcg_id: card.id,
+        name: card.name,
+        type: card.supertype.toLowerCase() === 'pokémon' ? 'pokemon_card' : card.supertype,
+        price: card.cardmarket?.prices?.averageSellPrice || 0,
+        tradeValue: card.cardmarket?.prices?.averageSellPrice * 0.5 || 0,
+        image_url: card.images.small,
         card_set: card.set.name,
-        rarity: card.rarity || 'Unknown'
+        rarity: card.rarity
       }));
-      console.log('Fetched TCG cards:', cards);
-
-      cards.forEach(card => {
-        db.run('INSERT OR IGNORE INTO collectibles (id, type, name, price, stock, image_url, tcg_id, card_set, rarity, condition) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          [card.tcg_id, card.type, card.name, card.price, 0, card.image_url, card.tcg_id, card.card_set, card.rarity, null],
-          (err) => {
-            if (err) console.error('Cache insert error:', err);
-          });
-      });
-
+      console.log('API returned:', cards.length, 'cards');
       event.reply('tcg-card-data', cards);
-    } catch (err) {
-      console.error('TCG card fetch error:', err);
-      event.reply('tcg-card-error', err.message);
-    }
-  });
+    })
+    .catch(err => {
+      console.error('TCG API error, falling back to DB:', err.message);
+      db.all('SELECT * FROM collectibles WHERE name LIKE ?', [`%${cardName}%`], (dbErr, rows) => {
+        if (dbErr) {
+          console.error('Database error:', dbErr);
+          event.reply('tcg-card-error', dbErr);
+          return;
+        }
+        console.log('Found in DB:', rows.length, 'matches');
+        event.reply('tcg-card-data', rows.map(row => ({
+          tcg_id: row.tcg_id,
+          name: row.name,
+          type: row.type,
+          price: row.price,
+          tradeValue: row.trade_value,
+          image_url: row.image_url,
+          card_set: row.card_set,
+          rarity: row.rarity,
+          condition: row.condition
+        })));
+      });
+    });
 });

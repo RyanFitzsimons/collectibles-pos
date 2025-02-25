@@ -614,7 +614,7 @@ function addToBuy() {
 }
 
 function fetchTcgCard(context) {
-  const input = document.getElementById(`${context}-tcg-card-name`); // Fixed selector
+  const input = document.getElementById(`${context}-tcg-card-name`);
   if (!input) {
     console.error(`No input found for context: ${context}`);
     return;
@@ -639,7 +639,7 @@ function fetchTcgCard(context) {
         <p>Set: ${card.card_set}</p>
         <p>Rarity: ${card.rarity}</p>
         <p>Price: ${cleanPrice(card.price.toFixed(2))}</p>
-        <button onclick='selectTcgCard(${JSON.stringify(card)}, "${context}")'>Select</button>
+        <button onclick="selectTcgCard(${JSON.stringify(card)}, '${context}')">Select</button>
       `;
       cardList.appendChild(cardDiv);
     });
