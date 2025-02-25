@@ -3,7 +3,7 @@ const { app, BrowserWindow, ipcMain, net } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const sqlite3 = require('sqlite3').verbose();
-const axios = require('axios'); // Add this
+const axios = require('axios');
 
 const dbPath = path.join(__dirname, 'inventory.db');
 const db = new sqlite3.Database(dbPath, (err) => {
@@ -23,7 +23,7 @@ db.serialize(() => {
     if (err) console.error('Error creating transactions table:', err);
     else console.log('Transactions table created or already exists');
   });
-  db.run('CREATE TABLE IF NOT EXISTS transaction_items (id INTEGER PRIMARY KEY AUTOINCREMENT, transaction_id TEXT, item_id TEXT, role TEXT, trade_value REAL, negotiated_price REAL)', (err) => {
+  db.run('CREATE TABLE IF NOT EXISTS transaction_items (id INTEGER PRIMARY KEY AUTOINCREMENT, transaction_id TEXT, item_id TEXT, name TEXT, role TEXT, trade_value REAL, negotiated_price REAL, original_price REAL, image_url TEXT, condition TEXT, card_set TEXT)', (err) => {
     if (err) console.error('Error creating transaction_items table:', err);
     else console.log('Transaction_items table created or already exists');
   });
@@ -121,16 +121,16 @@ ipcMain.on('complete-transaction', (event, { items, type, cashIn, cashOut }) => 
       }
       const itemInserts = items.map(item => new Promise((resolve, reject) => {
         if (item.role === 'trade_in') {
-          db.run('INSERT INTO transaction_items (transaction_id, item_id, role, trade_value) VALUES (?, ?, ?, ?)',
-            [txId, item.id, item.role, item.tradeValue], (err) => {
+          db.run('INSERT INTO transaction_items (transaction_id, item_id, name, role, trade_value, original_price, image_url, condition, card_set) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [txId, item.id, item.name, item.role, item.tradeValue, item.price, item.image_url, item.condition, item.card_set], (err) => {
               if (err) reject(err);
               else resolve();
             });
         } else if (item.role === 'sold' || item.role === 'trade_out') {
           db.run('UPDATE collectibles SET stock = stock - 1 WHERE id = ?', [item.id], (err) => {
             if (err) return reject(err);
-            db.run('INSERT INTO transaction_items (transaction_id, item_id, role, negotiated_price) VALUES (?, ?, ?, ?)',
-              [txId, item.id, item.role, item.negotiatedPrice], resolve);
+            db.run('INSERT INTO transaction_items (transaction_id, item_id, name, role, negotiated_price, original_price, image_url, condition, card_set) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+              [txId, item.id, item.name, item.role, item.negotiatedPrice, item.price, item.image_url, item.condition, item.card_set], resolve);
           });
         }
       }));
@@ -240,8 +240,7 @@ ipcMain.on('get-tcg-card', (event, cardName) => {
           tradeValue: row.trade_value,
           image_url: row.image_url,
           card_set: row.card_set,
-          rarity: row.rarity,
-          condition: row.condition
+          rarity: row.rarity
         })));
       });
     });
