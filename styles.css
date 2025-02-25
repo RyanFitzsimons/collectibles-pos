@@ -299,3 +299,19 @@
   .transactions-table .toggle-items:hover {
     background-color: #5B6EAE;
   }
+
+  .transactions-table + .input-group {
+    margin-bottom: 15px;
+  }
+  
+  .transactions-table + .input-group label {
+    display: block;
+    color: #FFFFFF;
+    margin-bottom: 5px;
+    font-weight: bold;
+  }
+  
+  .transactions-table + .input-group input {
+    width: 100%;
+    max-width: 400px;
+  }

@@ -131,96 +131,118 @@ function showScreen(screen) {
         }
       });
 
-      const sortedTransactions = Object.entries(transactions).sort((a, b) => new Date(b[1].timestamp) - new Date(a[1].timestamp));
+      let allTransactions = Object.entries(transactions);
+      let sortedTransactions = allTransactions.sort((a, b) => new Date(b[1].timestamp) - new Date(a[1].timestamp));
+      let currentSortKey = 'timestamp';
+      let isAsc = false;
 
-      content.innerHTML = `
-        <div class="section">
-          <h3>Transactions</h3>
-          <table class="transactions-table">
-            <thead>
-              <tr>
-                <th data-sort="id">ID</th>
-                <th data-sort="type">Type</th>
-                <th data-sort="cash_in">Cash In</th>
-                <th data-sort="cash_out">Cash Out</th>
-                <th data-sort="timestamp">Timestamp</th>
-                <th>Items</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${sortedTransactions.map(([id, tx]) => `
+      function renderTransactions(filteredTransactions) {
+        const totalCashIn = filteredTransactions.reduce((sum, [, tx]) => sum + (parseFloat(tx.cash_in) || 0), 0);
+        const totalCashOut = filteredTransactions.reduce((sum, [, tx]) => sum + (parseFloat(tx.cash_out) || 0), 0);
+
+        content.innerHTML = `
+          <div class="section">
+            <h3>Transactions</h3>
+            <div class="input-group">
+              <label>Filter Transactions</label>
+              <input id="transactions-search" type="text" placeholder="Search by ID, Type, or Item Name">
+            </div>
+            <p>Total Cash In: ${cleanPrice(totalCashIn.toFixed(2))}</p>
+            <p>Total Cash Out: ${cleanPrice(totalCashOut.toFixed(2))}</p>
+            <table class="transactions-table">
+              <thead>
                 <tr>
-                  <td>${id}</td>
-                  <td>${tx.type}</td>
-                  <td>${cleanPrice(tx.cash_in || 0)}</td>
-                  <td>${cleanPrice(tx.cash_out || 0)}</td>
-                  <td>${tx.timestamp}</td>
-                  <td>
-                    <button class="toggle-items" data-id="${id}">Show Items</button>
-                    <ul class="items-list" id="items-${id}" style="display: none;">
-                      ${tx.items.map(item => `
-                        <li>
-                          ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}">` : ''}
-                          ${item.name} (${item.card_set || 'Unknown Set'}) (${item.condition || 'Not Set'}) (${item.role === 'trade_in' ? 'Trade-In' : item.role === 'trade_out' ? 'Trade-Out' : 'Sold'}) - 
-                          ${item.role === 'trade_in' ? `Trade Value: ${cleanPrice(item.trade_value)}` : `Sold For: ${cleanPrice(item.negotiated_price || item.original_price)}`}
-                        </li>
-                      `).join('')}
-                    </ul>
-                  </td>
+                  <th data-sort="id">ID</th>
+                  <th data-sort="type">Type</th>
+                  <th data-sort="cash_in">Cash In</th>
+                  <th data-sort="cash_out">Cash Out</th>
+                  <th data-sort="timestamp">Timestamp</th>
+                  <th>Items</th>
                 </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        </div>
-      `;
+              </thead>
+              <tbody>
+                ${filteredTransactions.map(([id, tx]) => `
+                  <tr>
+                    <td>${id}</td>
+                    <td>${tx.type}</td>
+                    <td>${cleanPrice(tx.cash_in || 0)}</td>
+                    <td>${cleanPrice(tx.cash_out || 0)}</td>
+                    <td>${tx.timestamp}</td>
+                    <td>
+                      <button class="toggle-items" data-id="${id}">Show Items</button>
+                      <ul class="items-list" id="items-${id}" style="display: none;">
+                        ${tx.items.map(item => `
+                          <li>
+                            ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}">` : ''}
+                            ${item.name} (${item.card_set || 'Unknown Set'}) (${item.condition || 'Not Set'}) (${item.role === 'trade_in' ? 'Trade-In' : item.role === 'trade_out' ? 'Trade-Out' : 'Sold'}) - 
+                            ${item.role === 'trade_in' ? `Trade Value: ${cleanPrice(item.trade_value)}` : `Sold For: ${cleanPrice(item.negotiated_price || item.original_price)}`}
+                          </li>
+                        `).join('')}
+                      </ul>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        `;
 
-      const table = document.querySelector('.transactions-table');
-      table.querySelectorAll('th[data-sort]').forEach(th => {
-        th.addEventListener('click', () => {
-          const key = th.dataset.sort;
-          const isAsc = th.classList.toggle('asc');
-          sortedTransactions.sort((a, b) => {
-            const aVal = key === 'timestamp' ? new Date(a[1][key]) : (a[1][key] || 0);
-            const bVal = key === 'timestamp' ? new Date(b[1][key]) : (b[1][key] || 0);
+        // Sorting
+        const table = document.querySelector('.transactions-table');
+        table.querySelectorAll('th[data-sort]').forEach(th => {
+          th.addEventListener('click', () => {
+            const key = th.dataset.sort;
+            if (key === currentSortKey) {
+              isAsc = !isAsc;
+            } else {
+              currentSortKey = key;
+              isAsc = false;
+            }
+            th.classList.toggle('asc', isAsc);
+            sortedTransactions.sort((a, b) => {
+              const aVal = key === 'timestamp' ? new Date(a[1][key]) : (a[1][key] || 0);
+              const bVal = key === 'timestamp' ? new Date(b[1][key]) : (b[1][key] || 0);
+              return isAsc ? aVal - bVal : bVal - aVal;
+            });
+            renderTransactions(sortedTransactions);
+          });
+        });
+
+        // Filtering
+        document.getElementById('transactions-search').addEventListener('input', (e) => {
+          const searchTerm = e.target.value.toLowerCase();
+          const filtered = allTransactions.filter(([id, tx]) => {
+            const itemNames = tx.items.map(item => item.name.toLowerCase()).join(' ');
+            return (
+              id.toLowerCase().includes(searchTerm) ||
+              tx.type.toLowerCase().includes(searchTerm) ||
+              itemNames.includes(searchTerm)
+            );
+          });
+          sortedTransactions = filtered.sort((a, b) => {
+            const aVal = currentSortKey === 'timestamp' ? new Date(a[1][currentSortKey]) : (a[1][currentSortKey] || 0);
+            const bVal = currentSortKey === 'timestamp' ? new Date(b[1][currentSortKey]) : (b[1][currentSortKey] || 0);
             return isAsc ? aVal - bVal : bVal - aVal;
           });
-          table.querySelector('tbody').innerHTML = sortedTransactions.map(([id, tx]) => `
-            <tr>
-              <td>${id}</td>
-              <td>${tx.type}</td>
-              <td>${cleanPrice(tx.cash_in || 0)}</td>
-              <td>${cleanPrice(tx.cash_out || 0)}</td>
-              <td>${tx.timestamp}</td>
-              <td>
-                <button class="toggle-items" data-id="${id}">Show Items</button>
-                <ul class="items-list" id="items-${id}" style="display: none;">
-                  ${tx.items.map(item => `
-                    <li>
-                      ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}">` : ''}
-                      ${item.name} (${item.card_set || 'Unknown Set'}) (${item.condition || 'Not Set'}) (${item.role === 'trade_in' ? 'Trade-In' : item.role === 'trade_out' ? 'Trade-Out' : 'Sold'}) - 
-                      ${item.role === 'trade_in' ? `Trade Value: ${cleanPrice(item.trade_value)}` : `Sold For: ${cleanPrice(item.negotiated_price || item.original_price)}`}
-                    </li>
-                  `).join('')}
-                </ul>
-              </td>
-            </tr>
-          `).join('');
-          bindToggleEvents();
+          renderTransactions(sortedTransactions);
         });
-      });
 
-      function bindToggleEvents() {
-        document.querySelectorAll('.toggle-items').forEach(button => {
-          button.addEventListener('click', () => {
-            const id = button.dataset.id;
-            const itemsList = document.getElementById(`items-${id}`);
-            const isVisible = itemsList.style.display !== 'none';
-            itemsList.style.display = isVisible ? 'none' : 'block';
-            button.textContent = isVisible ? 'Show Items' : 'Hide Items';
+        // Toggle items
+        function bindToggleEvents() {
+          document.querySelectorAll('.toggle-items').forEach(button => {
+            button.addEventListener('click', () => {
+              const id = button.dataset.id;
+              const itemsList = document.getElementById(`items-${id}`);
+              const isVisible = itemsList.style.display !== 'none';
+              itemsList.style.display = isVisible ? 'none' : 'block';
+              button.textContent = isVisible ? 'Show Items' : 'Hide Items';
+            });
           });
-        });
+        }
+        bindToggleEvents();
       }
-      bindToggleEvents();
+
+      renderTransactions(sortedTransactions);
     });
   }
 }
