@@ -57,7 +57,7 @@ app.on('window-all-closed', () => {
 ipcMain.on('add-item', async (event, item) => {
   let imageUrl = null;
 
-  if (item.image_url) {
+  if (item.image_url && !item.image_url.startsWith('file://')) {
     imageUrl = path.join(__dirname, 'images', `${item.id}-${item.tcg_id || 'card'}.png`);
     try {
       await new Promise((resolve, reject) => {
@@ -90,7 +90,7 @@ ipcMain.on('add-item', async (event, item) => {
 
   const finalItem = {
     ...item,
-    image_url: imageUrl ? `file://${imageUrl}` : null
+    image_url: imageUrl ? `file://${imageUrl}` : item.image_url
   };
   
   if (item.role === 'trade_in') {
@@ -120,25 +120,36 @@ ipcMain.on('complete-transaction', (event, { items, type, cashIn, cashOut }) => 
         return event.reply('transaction-error', err.message);
       }
       const itemInserts = items.map(item => new Promise((resolve, reject) => {
-        const imageUrl = item.image_url && !item.image_url.startsWith('file://') 
-          ? `file://${path.join(__dirname, 'images', `${item.id}-${item.tcg_id || 'card'}.png`)}` 
-          : item.image_url; // Normalize path for all roles
         if (item.role === 'trade_in') {
+          const imageUrl = item.image_url && !item.image_url.startsWith('file://') 
+            ? `file://${path.join(__dirname, 'images', `${item.id}-${item.tcg_id || 'card'}.png`)}` 
+            : item.image_url;
           db.run('INSERT INTO transaction_items (transaction_id, item_id, name, role, trade_value, original_price, image_url, condition, card_set) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [txId, item.id, item.name, item.role, item.tradeValue, item.price, imageUrl, item.condition, item.card_set], (err) => {
               if (err) reject(err);
               else resolve();
             });
         } else if (item.role === 'sold' || item.role === 'trade_out') {
-          db.run('UPDATE collectibles SET stock = stock - 1 WHERE id = ?', [item.id], (err) => {
+          db.get('SELECT image_url, condition, card_set FROM collectibles WHERE id = ?', [item.id], (err, row) => {
             if (err) return reject(err);
+            const imageUrl = row ? row.image_url : item.image_url; // Reuse collectibles image_url
+            const condition = row ? row.condition : item.condition;
+            const cardSet = row ? row.card_set : item.card_set;
             db.run('INSERT INTO transaction_items (transaction_id, item_id, name, role, negotiated_price, original_price, image_url, condition, card_set) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-              [txId, item.id, item.name, item.role, item.negotiatedPrice, item.price, imageUrl, item.condition, item.card_set], resolve);
+              [txId, item.id, item.name, item.role, item.negotiatedPrice, item.price, imageUrl, condition, cardSet], (err) => {
+                if (err) reject(err);
+                else resolve();
+              });
           });
         }
       }));
       Promise.all(itemInserts)
-        .then(() => event.reply('transaction-complete', { txId, type }))
+        .then(() => {
+          db.run('UPDATE collectibles SET stock = stock - 1 WHERE id IN (SELECT item_id FROM transaction_items WHERE transaction_id = ? AND role IN ("sold", "trade_out"))', [txId], (err) => {
+            if (err) console.error('Error updating stock:', err);
+            event.reply('transaction-complete', { txId, type });
+          });
+        })
         .catch(err => event.reply('transaction-error', err.message));
     }
   );
