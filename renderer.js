@@ -113,11 +113,11 @@ function showScreen(screen) {
     ipcRenderer.once('transactions-data', (event, rows) => {
       const transactions = {};
       rows.forEach(row => {
-        const txId = row.transaction_id; // Unique transaction ID
+        const txId = row.transaction_id;
         if (!transactions[txId]) {
           transactions[txId] = { 
             id: txId, 
-            type: row.transaction_type, // Use transaction_type from query
+            type: row.transaction_type, 
             cash_in: row.cash_in, 
             cash_out: row.cash_out, 
             timestamp: row.timestamp, 
@@ -156,6 +156,14 @@ function showScreen(screen) {
         const startIndex = (currentPage - 1) * itemsPerPage;
         const paginatedTransactions = filteredTransactions.slice(startIndex, startIndex + itemsPerPage);
 
+        // Quick Stats
+        const stats = {
+          total: filteredTransactions.length,
+          sells: filteredTransactions.filter(([, tx]) => tx.type === 'sell').length,
+          buys: filteredTransactions.filter(([, tx]) => tx.type === 'buy').length,
+          trades: filteredTransactions.filter(([, tx]) => tx.type === 'trade').length
+        };
+
         content.innerHTML = `
           <div class="section">
             <h3>Transactions</h3>
@@ -169,6 +177,7 @@ function showScreen(screen) {
               <label>End Date</label>
               <input id="transactions-end-date" type="date" value="${endDate}">
             </div>
+            <p>Stats: Total: ${stats.total}, Sells: ${stats.sells}, Buys: ${stats.buys}, Trades: ${stats.trades}</p>
             <p>Total Cash In: ${cleanPrice(totalCashIn.toFixed(2))}</p>
             <p>Total Cash Out: ${cleanPrice(totalCashOut.toFixed(2))}</p>
             <button id="export-csv">Export to CSV</button>
@@ -185,7 +194,7 @@ function showScreen(screen) {
               </thead>
               <tbody>
                 ${paginatedTransactions.map(([id, tx]) => `
-                  <tr>
+                  <tr class="${tx.type}">
                     <td>${id}</td>
                     <td>${tx.type || 'Unknown'}</td>
                     <td>${cleanPrice(tx.cash_in || 0)}</td>
@@ -271,7 +280,7 @@ function showScreen(screen) {
           let csvContent = 'ID,Type,Cash In,Cash Out,Timestamp,Items\n';
           filteredTransactions.forEach(([id, tx]) => {
             const itemsStr = tx.items.map(item => 
-              `${item.name} (${item.card_set || 'Unknown Set'}) (${item.condition || 'Not Set'}) (${item.role === 'trade_in' ? 'Trade-In' : item.role === 'trade_out' ? 'Trade-Out' : 'Sold'}) - ${item.role === 'trade_in' ? cleanPrice(item.trade_value) : cleanPrice(item.negotiated_price || item.original_price)}`
+              `${item.name} (${item.card_set || 'Unknown Set'}) (${item.condition || 'Not Set'}) (${item.role === 'trade_in' ? 'Trade-In' : item.role === 'trade_out' ? 'Trade-Out' : 'Sold'}) - ${item.role === 'trade_in' ? cleanPrice(item.tradeValue) : cleanPrice(item.negotiated_price || item.original_price)}`
             ).join('; ');
             csvContent += `${id},${tx.type || 'Unknown'},${cleanPrice(tx.cash_in || 0)},${cleanPrice(tx.cash_out || 0)},${tx.timestamp},"${itemsStr.replace(/"/g, '""')}"\n`;
           });

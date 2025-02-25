@@ -349,3 +349,21 @@
     border-radius: 4px;
     width: 150px;
   }
+
+  .transactions-table tr.sell {
+    background-color: #2E4F33; /* Dark green for sell */
+  }
+  
+  .transactions-table tr.buy {
+    background-color: #4F2E2E; /* Dark red for buy */
+  }
+  
+  .transactions-table tr.trade {
+    background-color: #2E3B4F; /* Dark blue for trade */
+  }
+  
+  .transactions-table tr.sell:hover,
+  .transactions-table tr.buy:hover,
+  .transactions-table tr.trade:hover {
+    background-color: #40444B; /* Consistent hover */
+  }
