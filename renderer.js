@@ -31,91 +31,77 @@ function showScreen(screen) {
   } else if (screen === 'buy') {
     const totalPayout = buyItems.reduce((sum, item) => sum + item.tradeValue, 0);
     content.innerHTML = `
-      <h3>Buy from Customer</h3>
-      <input id="tcg-card-name" placeholder="Card Name (e.g., Charizard)">
-      <button onclick="fetchTcgCard('buy')">Fetch Card</button>
-      <div id="tcg-modal-buy" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
-        <div style="background: white; margin: 50px auto; padding: 20px; width: 80%; max-height: 80%; overflow-y: auto;">
-          <h4>Select a Card</h4>
-          <div id="tcg-card-list-buy" style="display: flex; flex-wrap: wrap; gap: 20px;"></div>
-          <button onclick="closeTcgModal('buy')">Close</button>
+      <div class="section">
+        <h3>Add Item</h3>
+        <div class="input-group">
+          <label>Search TCG Card</label>
+          <input id="tcg-card-name" placeholder="e.g., Charizard" type="text">
+          <button onclick="fetchTcgCard('buy')">Fetch Card</button>
         </div>
+        <div id="tcg-modal-buy" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
+          <div style="background: white; margin: 50px auto; padding: 20px; width: 80%; max-height: 80%; overflow-y: auto;">
+            <h4>Select a Card</h4>
+            <div id="tcg-card-list-buy" style="display: flex; flex-wrap: wrap; gap: 20px;"></div>
+            <button onclick="closeTcgModal('buy')">Close</button>
+          </div>
+        </div>
+        <div class="input-group">
+          <label>Card Name</label>
+          <input id="buy-name" placeholder="Enter card name" type="text">
+        </div>
+        <div class="input-group">
+          <label>Type</label>
+          <input id="buy-type" placeholder="e.g., pokemon_card" type="text">
+        </div>
+        <div class="input-group">
+          <label>Market Price (£)</label>
+          <input id="buy-price" placeholder="Enter price" type="number">
+        </div>
+        <div class="input-group">
+          <label>Trade Value (£)</label>
+          <input id="buy-trade-value" placeholder="Enter trade value" type="number">
+        </div>
+        <div class="input-group">
+          <label>Condition</label>
+          <select id="buy-condition-category">
+            <option value="">Select Category</option>
+            <option value="Raw">Raw</option>
+            <option value="PSA">PSA</option>
+            <option value="CGC">CGC</option>
+            <option value="BGS">BGS</option>
+            <option value="TAG">TAG</option>
+            <option value="Other">Other</option>
+          </select>
+          <input id="buy-condition-value" placeholder="e.g., NM, 7" type="text">
+        </div>
+        <div class="input-group">
+          <label>Image</label>
+          <input id="buy-image" type="file" accept="image/*">
+        </div>
+        <input id="buy-tcg-id" type="hidden">
+        <input id="buy-card-set" type="hidden">
+        <input id="buy-rarity" type="hidden">
+        <input id="buy-image-url" type="hidden">
+        <button onclick="addToBuy()">Add Item</button>
       </div>
-      <input id="buy-name" placeholder="Name">
-      <input id="buy-type" placeholder="Type (e.g., pokemon_card)">
-      <input id="buy-price" type="number" placeholder="Market Price">
-      <input id="buy-trade-value" type="number" placeholder="Trade Value">
-      <select id="buy-condition-category">
-        <option value="">Select Category</option>
-        <option value="Raw">Raw</option>
-        <option value="PSA">PSA</option>
-        <option value="CGC">CGC</option>
-        <option value="BGS">BGS</option>
-        <option value="TAG">TAG</option>
-        <option value="Other">Other</option>
-      </select>
-      <input id="buy-condition-value" type="text" placeholder="Condition/Grade (e.g., NM, 7)">
-      <input id="buy-image" type="file" accept="image/*">
-      <input id="buy-tcg-id" type="hidden">
-      <input id="buy-card-set" type="hidden">
-      <input id="buy-rarity" type="hidden">
-      <input id="buy-image-url" type="hidden">
-      <button onclick="addToBuy()">Add Item</button>
-      <ul id="buy-items">
-        ${buyItems.map(item => `
-          <li>
-            ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}" style="max-width: 50px;">` : ''}
-            ${item.name} (${item.card_set || 'Unknown Set'}) - £${item.tradeValue} (${item.condition || 'Not Set'})
-          </li>
-        `).join('')}
-      </ul>
-      <p>Total Payout: £${totalPayout.toFixed(2)}</p>
-      <button onclick="completeBuyTransaction()">Complete Buy</button>
+      <div class="section">
+        <h3>Buy Cart</h3>
+        <ul id="buy-items">
+          ${buyItems.map(item => `
+            <li>
+              ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}" style="max-width: 50px;">` : ''}
+              ${item.name} (${item.card_set || 'Unknown Set'}) - £${item.tradeValue} (${item.condition || 'Not Set'})
+            </li>
+          `).join('')}
+        </ul>
+        <p>Total Payout: £${totalPayout.toFixed(2)}</p>
+        <button onclick="completeBuyTransaction()">Complete Buy</button>
+      </div>
     `;
   } else if (screen === 'trade') {
     fetchInventory('trade-out', tradeOutPage, tradeOutSearchTerm);
   } else if (screen === 'transactions') {
     ipcRenderer.send('get-transactions');
-    ipcRenderer.once('transactions-data', (event, rows) => {
-      const transactions = {};
-      rows.forEach(row => {
-        if (!transactions[row.id]) {
-          transactions[row.id] = { type: row.type, cash_in: row.cash_in, cash_out: row.cash_out, timestamp: row.timestamp, items: [] };
-        }
-        if (row.item_id) {
-          transactions[row.id].items.push({
-            item_id: row.item_id,
-            name: row.item_name,
-            role: row.role,
-            trade_value: row.trade_value,
-            negotiated_price: row.negotiated_price,
-            original_price: row.original_price,
-            image_url: row.image_url,
-            condition: row.condition,
-            card_set: row.card_set
-          });
-        }
-      });
-      content.innerHTML = `
-        <h3>Transactions</h3>
-        <ul>
-          ${Object.entries(transactions).map(([id, tx]) => `
-            <li>
-              ID: ${id}, Type: ${tx.type}, Cash In: £${tx.cash_in || 0}, Cash Out: £${tx.cash_out || 0}, Time: ${tx.timestamp}
-              <ul>
-                ${tx.items.map(item => `
-                  <li>
-                    ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}">` : ''}
-                    ${item.name} (${item.card_set || 'Unknown Set'}) (${item.condition || 'Not Set'}) (${item.role === 'trade_in' ? 'Trade-In' : item.role === 'trade_out' ? 'Trade-Out' : 'Sold'}) - 
-                    ${item.role === 'trade_in' ? `Trade Value: £${item.trade_value}` : `Sold For: £${item.negotiated_price || item.original_price}`}
-                  </li>
-                `).join('')}
-              </ul>
-            </li>
-          `).join('')}
-        </ul>
-      `;
-    });
   }
 }
 

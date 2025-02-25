@@ -178,3 +178,38 @@
     color: #BABDCA; /* Softer gray */
     margin: 5px 0;
   }
+
+  /* Sections */
+.section {
+    background-color: #35393F;
+    padding: 20px;
+    margin-bottom: 20px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  }
+  
+  /* Input Groups */
+  .input-group {
+    margin-bottom: 15px;
+  }
+  
+  .input-group label {
+    display: block;
+    color: #FFFFFF;
+    margin-bottom: 5px;
+    font-weight: bold;
+  }
+  
+  .input-group select, .input-group input[type="text"], .input-group input[type="number"] {
+    width: 100%;
+    max-width: 300px;
+  }
+  
+  .input-group button {
+    margin-left: 10px;
+  }
+  
+  /* Cart Section */
+  .section ul {
+    margin-top: 15px;
+  }
