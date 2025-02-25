@@ -213,3 +213,35 @@
   .section ul {
     margin-top: 15px;
   }
+
+  /* Trade Container */
+.trade-container {
+    display: flex;
+    gap: 20px;
+    height: calc(100vh - 40px); /* Full height minus padding */
+  }
+  
+  /* Trade Sections */
+  .trade-section {
+    flex: 1;
+    overflow-y: auto; /* Scroll if content overflows */
+  }
+  
+  .trade-in, .trade-out {
+    padding: 10px;
+  }
+  
+  .trade-in .section, .trade-out .section {
+    margin-bottom: 20px;
+  }
+  
+  /* Adjust Inputs for Trade-In */
+  .trade-in .input-group input, .trade-in .input-group select {
+    max-width: 250px;
+  }
+  
+  /* Trade-Out Inventory */
+  .trade-out #trade-out-search {
+    width: 100%;
+    max-width: 400px;
+  }
