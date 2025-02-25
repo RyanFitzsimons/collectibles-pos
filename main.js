@@ -169,12 +169,32 @@ ipcMain.on('get-inventory', (event, { page = 1, limit = 50, search = '' } = {}) 
 });
 
 ipcMain.on('get-transactions', (event) => {
-  db.all('SELECT t.*, ti.item_id, ti.role, ti.trade_value, ti.negotiated_price, c.name AS item_name, c.type, c.price AS original_price, c.image_url, c.condition, c.card_set ' +
-         'FROM transactions t ' +
-         'LEFT JOIN transaction_items ti ON t.id = ti.transaction_id ' +
-         'LEFT JOIN collectibles c ON ti.item_id = c.id', (err, rows) => {
-    if (err) console.error('Get transactions error:', err);
-    event.reply('transactions-data', rows || []);
+  db.all(`
+    SELECT 
+      t.id AS transaction_id, 
+      t.type AS transaction_type, 
+      t.cash_in, 
+      t.cash_out, 
+      t.timestamp,
+      ti.item_id, 
+      ti.name AS item_name, 
+      ti.role, 
+      ti.trade_value, 
+      ti.negotiated_price, 
+      ti.original_price, 
+      ti.image_url, 
+      ti.condition, 
+      ti.card_set
+    FROM transactions t
+    LEFT JOIN transaction_items ti ON t.id = ti.transaction_id
+  `, (err, rows) => {
+    if (err) {
+      console.error('Error fetching transactions:', err);
+      event.sender.send('transactions-error', err);
+    } else {
+      console.log('Transactions fetched:', rows.length);
+      event.sender.send('transactions-data', rows);
+    }
   });
 });
 

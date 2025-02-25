@@ -113,11 +113,19 @@ function showScreen(screen) {
     ipcRenderer.once('transactions-data', (event, rows) => {
       const transactions = {};
       rows.forEach(row => {
-        if (!transactions[row.id]) {
-          transactions[row.id] = { type: row.type, cash_in: row.cash_in, cash_out: row.cash_out, timestamp: row.timestamp, items: [] };
+        const txId = row.transaction_id; // Unique transaction ID
+        if (!transactions[txId]) {
+          transactions[txId] = { 
+            id: txId, 
+            type: row.transaction_type, // Use transaction_type from query
+            cash_in: row.cash_in, 
+            cash_out: row.cash_out, 
+            timestamp: row.timestamp, 
+            items: [] 
+          };
         }
         if (row.item_id) {
-          transactions[row.id].items.push({
+          transactions[txId].items.push({
             item_id: row.item_id,
             name: row.item_name,
             role: row.role,
@@ -179,7 +187,7 @@ function showScreen(screen) {
                 ${paginatedTransactions.map(([id, tx]) => `
                   <tr>
                     <td>${id}</td>
-                    <td>${tx.type}</td>
+                    <td>${tx.type || 'Unknown'}</td>
                     <td>${cleanPrice(tx.cash_in || 0)}</td>
                     <td>${cleanPrice(tx.cash_out || 0)}</td>
                     <td>${tx.timestamp}</td>
@@ -265,7 +273,7 @@ function showScreen(screen) {
             const itemsStr = tx.items.map(item => 
               `${item.name} (${item.card_set || 'Unknown Set'}) (${item.condition || 'Not Set'}) (${item.role === 'trade_in' ? 'Trade-In' : item.role === 'trade_out' ? 'Trade-Out' : 'Sold'}) - ${item.role === 'trade_in' ? cleanPrice(item.trade_value) : cleanPrice(item.negotiated_price || item.original_price)}`
             ).join('; ');
-            csvContent += `${id},${tx.type},${cleanPrice(tx.cash_in || 0)},${cleanPrice(tx.cash_out || 0)},${tx.timestamp},"${itemsStr.replace(/"/g, '""')}"\n`;
+            csvContent += `${id},${tx.type || 'Unknown'},${cleanPrice(tx.cash_in || 0)},${cleanPrice(tx.cash_out || 0)},${tx.timestamp},"${itemsStr.replace(/"/g, '""')}"\n`;
           });
           const blob = new Blob([csvContent], { type: 'text/csv' });
           const url = window.URL.createObjectURL(blob);
@@ -298,7 +306,7 @@ function showScreen(screen) {
               const itemNames = tx.items.map(item => item.name.toLowerCase()).join(' ');
               return (
                 id.toLowerCase().includes(searchTerm) ||
-                tx.type.toLowerCase().includes(searchTerm) ||
+                (tx.type || '').toLowerCase().includes(searchTerm) ||
                 itemNames.includes(searchTerm)
               );
             });
