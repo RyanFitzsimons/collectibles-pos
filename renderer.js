@@ -122,7 +122,7 @@ function showScreen(screen) {
             </li>
           `).join('')}
         </ul>
-        <p>Total Payout: ${cleanPrice(totalPayout.toFixed(2))}</p>
+        <p>Total Payout: ${cleanPrice(totalPayout.toFixed(2))}, Items: ${buyItems.length}</p>
         <button onclick="completeBuyTransaction()">Complete Buy</button>
         <button id="clear-buy-cart">Clear Cart</button>
       </div>
@@ -230,7 +230,7 @@ function showScreen(screen) {
                           <li>
                             ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}">` : ''}
                             ${item.name} (${item.card_set || 'Unknown Set'}) (${item.condition || 'Not Set'}) (${item.role === 'trade_in' ? 'Trade-In' : item.role === 'trade_out' ? 'Trade-Out' : 'Sold'}) - 
-                            ${item.role === 'trade_in' ? `Trade Value: ${cleanPrice(item.tradeValue)}` : `Sold For: ${cleanPrice(item.negotiated_price || item.original_price)}`}
+                            ${item.role === 'trade_in' ? `Trade Value: ${cleanPrice(item.trade_value || 0)}` : `Sold For: ${cleanPrice(item.negotiated_price || item.original_price || 0)}`}
                           </li>
                         `).join('')}
                       </ul>
@@ -251,18 +251,22 @@ function showScreen(screen) {
         table.querySelectorAll('th[data-sort]').forEach(th => {
           th.addEventListener('click', () => {
             const key = th.dataset.sort;
-            if (key === currentSortKey) {
+            if (key === 'timestamp') {
               isAsc = !isAsc;
+              sortedTransactions.sort((a, b) => isAsc 
+                ? new Date(a[1].timestamp) - new Date(b[1].timestamp) 
+                : new Date(b[1].timestamp) - new Date(a[1].timestamp));
             } else {
-              currentSortKey = key;
-              isAsc = false;
+              if (key === currentSortKey) isAsc = !isAsc;
+              else {
+                currentSortKey = key;
+                isAsc = false;
+              }
+              sortedTransactions.sort((a, b) => isAsc 
+                ? (a[1][key] || 0) - (b[1][key] || 0) 
+                : (b[1][key] || 0) - (a[1][key] || 0));
             }
             th.classList.toggle('asc', isAsc);
-            sortedTransactions.sort((a, b) => {
-              const aVal = key === 'timestamp' ? new Date(a[1][key]) : (a[1][key] || 0);
-              const bVal = key === 'timestamp' ? new Date(b[1][key]) : (b[1][key] || 0);
-              return isAsc ? aVal - bVal : bVal - aVal;
-            });
             renderTransactions(sortedTransactions);
           });
         });
@@ -298,7 +302,7 @@ function showScreen(screen) {
           let csvContent = 'ID,Type,Cash In,Cash Out,Timestamp,Items\n';
           filteredTransactions.forEach(([id, tx]) => {
             const itemsStr = tx.items.map(item => 
-              `${item.name} (${item.card_set || 'Unknown Set'}) (${item.condition || 'Not Set'}) (${item.role === 'trade_in' ? 'Trade-In' : item.role === 'trade_out' ? 'Trade-Out' : 'Sold'}) - ${item.role === 'trade_in' ? cleanPrice(item.tradeValue) : cleanPrice(item.negotiated_price || item.original_price)}`
+              `${item.name} (${item.card_set || 'Unknown Set'}) (${item.condition || 'Not Set'}) (${item.role === 'trade_in' ? 'Trade-In' : item.role === 'trade_out' ? 'Trade-Out' : 'Sold'}) - ${item.role === 'trade_in' ? cleanPrice(item.trade_value || 0) : cleanPrice(item.negotiated_price || item.original_price || 0)}`
             ).join('; ');
             csvContent += `${id},${tx.type || 'Unknown'},${cleanPrice(tx.cash_in || 0)},${cleanPrice(tx.cash_out || 0)},${tx.timestamp},"${itemsStr.replace(/"/g, '""')}"\n`;
           });
@@ -347,7 +351,7 @@ function showScreen(screen) {
             const bVal = currentSortKey === 'timestamp' ? new Date(b[1][currentSortKey]) : (b[1][currentSortKey] || 0);
             return isAsc ? aVal - bVal : bVal - aVal;
           });
-          currentPage = 1; // Reset to first page on filter
+          currentPage = 1;
           renderTransactions(sortedTransactions);
         }
       }
