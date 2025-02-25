@@ -30,6 +30,9 @@ function cleanPrice(price) {
   return `\u00A3${cleaned}`; // Unicode £
 }
 
+javascript
+Wrap
+Copy
 function showScreen(screen) {
   console.log('Showing screen:', screen, { sellCart, tradeInCart, tradeOutCart, buyItems });
   const content = document.getElementById('content');
@@ -135,6 +138,7 @@ function showScreen(screen) {
       let sortedTransactions = allTransactions.sort((a, b) => new Date(b[1].timestamp) - new Date(a[1].timestamp));
       let currentSortKey = 'timestamp';
       let isAsc = false;
+      let searchTerm = '';
 
       function renderTransactions(filteredTransactions) {
         const totalCashIn = filteredTransactions.reduce((sum, [, tx]) => sum + (parseFloat(tx.cash_in) || 0), 0);
@@ -145,7 +149,7 @@ function showScreen(screen) {
             <h3>Transactions</h3>
             <div class="input-group">
               <label>Filter Transactions</label>
-              <input id="transactions-search" type="text" placeholder="Search by ID, Type, or Item Name">
+              <input id="transactions-search" type="text" placeholder="Search by ID, Type, or Item Name" value="${searchTerm}">
             </div>
             <p>Total Cash In: ${cleanPrice(totalCashIn.toFixed(2))}</p>
             <p>Total Cash Out: ${cleanPrice(totalCashOut.toFixed(2))}</p>
@@ -208,9 +212,9 @@ function showScreen(screen) {
           });
         });
 
-        // Filtering
-        document.getElementById('transactions-search').addEventListener('input', (e) => {
-          const searchTerm = e.target.value.toLowerCase();
+        // Debounced Filtering
+        document.getElementById('transactions-search').addEventListener('input', debounce((e) => {
+          searchTerm = e.target.value.toLowerCase();
           const filtered = allTransactions.filter(([id, tx]) => {
             const itemNames = tx.items.map(item => item.name.toLowerCase()).join(' ');
             return (
@@ -225,7 +229,7 @@ function showScreen(screen) {
             return isAsc ? aVal - bVal : bVal - aVal;
           });
           renderTransactions(sortedTransactions);
-        });
+        }, 600));
 
         // Toggle items
         function bindToggleEvents() {
