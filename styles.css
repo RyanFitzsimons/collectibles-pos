@@ -187,6 +187,20 @@
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
   }
+
+.section button[onclick^="clear"] {
+    background-color: #DA7272; /* Reddish for clear */
+    color: #FFFFFF;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    margin-left: 10px;
+}
+  
+.section button[onclick^="clear"]:hover {
+    background-color: #AE5B5B;
+}
   
   /* Input Groups */
   .input-group {

@@ -30,6 +30,26 @@ function cleanPrice(price) {
   return `\u00A3${cleaned}`; // Unicode £
 }
 
+function clearBuyCart() {
+  buyItems.length = 0;
+  showScreen('buy');
+}
+
+function clearSellCart() {
+  sellCart.length = 0;
+  showScreen('sell');
+}
+
+function clearTradeInCart() {
+  tradeInCart.length = 0;
+  showScreen('trade');
+}
+
+function clearTradeOutCart() {
+  tradeOutCart.length = 0;
+  showScreen('trade');
+}
+
 function showScreen(screen) {
   console.log('Showing screen:', screen, { sellCart, tradeInCart, tradeOutCart, buyItems });
   const content = document.getElementById('content');
@@ -44,13 +64,13 @@ function showScreen(screen) {
         <div class="input-group">
           <label>Search TCG Card</label>
           <input id="buy-tcg-card-name" placeholder="e.g., Charizard" type="text">
-          <button onclick="fetchTcgCard('buy')">Fetch Card</button>
+          <button id="fetch-buy-card">Fetch Card</button>
         </div>
         <div id="tcg-modal-buy" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
           <div style="background: white; margin: 50px auto; padding: 20px; width: 80%; max-height: 80%; overflow-y: auto;">
             <h4>Select a Card</h4>
             <div id="tcg-card-list-buy" style="display: flex; flex-wrap: wrap; gap: 20px;"></div>
-            <button onclick="closeTcgModal('buy')">Close</button>
+            <button id="close-tcg-modal-buy">Close</button>
           </div>
         </div>
         <div class="input-group">
@@ -104,8 +124,12 @@ function showScreen(screen) {
         </ul>
         <p>Total Payout: ${cleanPrice(totalPayout.toFixed(2))}</p>
         <button onclick="completeBuyTransaction()">Complete Buy</button>
+        <button id="clear-buy-cart">Clear Cart</button>
       </div>
     `;
+    document.getElementById('fetch-buy-card').addEventListener('click', () => fetchTcgCard('buy'));
+    document.getElementById('close-tcg-modal-buy').addEventListener('click', () => closeTcgModal('buy'));
+    document.getElementById('clear-buy-cart').addEventListener('click', clearBuyCart);
   } else if (screen === 'trade') {
     fetchInventory('trade-out', tradeOutPage, tradeOutSearchTerm);
   } else if (screen === 'transactions') {
@@ -156,7 +180,6 @@ function showScreen(screen) {
         const startIndex = (currentPage - 1) * itemsPerPage;
         const paginatedTransactions = filteredTransactions.slice(startIndex, startIndex + itemsPerPage);
 
-        // Quick Stats
         const stats = {
           total: filteredTransactions.length,
           sells: filteredTransactions.filter(([, tx]) => tx.type === 'sell').length,
@@ -207,7 +230,7 @@ function showScreen(screen) {
                           <li>
                             ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}">` : ''}
                             ${item.name} (${item.card_set || 'Unknown Set'}) (${item.condition || 'Not Set'}) (${item.role === 'trade_in' ? 'Trade-In' : item.role === 'trade_out' ? 'Trade-Out' : 'Sold'}) - 
-                            ${item.role === 'trade_in' ? `Trade Value: ${cleanPrice(item.trade_value)}` : `Sold For: ${cleanPrice(item.negotiated_price || item.original_price)}`}
+                            ${item.role === 'trade_in' ? `Trade Value: ${cleanPrice(item.tradeValue)}` : `Sold For: ${cleanPrice(item.negotiated_price || item.original_price)}`}
                           </li>
                         `).join('')}
                       </ul>
@@ -224,7 +247,6 @@ function showScreen(screen) {
           </div>
         `;
 
-        // Sorting
         const table = document.querySelector('.transactions-table');
         table.querySelectorAll('th[data-sort]').forEach(th => {
           th.addEventListener('click', () => {
@@ -245,13 +267,11 @@ function showScreen(screen) {
           });
         });
 
-        // Debounced Filtering
         document.getElementById('transactions-search').addEventListener('input', debounce((e) => {
           searchTerm = e.target.value.toLowerCase();
           applyFilters();
         }, 600));
 
-        // Date Range Filtering
         document.getElementById('transactions-start-date').addEventListener('change', (e) => {
           startDate = e.target.value;
           applyFilters();
@@ -261,7 +281,6 @@ function showScreen(screen) {
           applyFilters();
         });
 
-        // Pagination
         document.getElementById('prev-page').addEventListener('click', () => {
           if (currentPage > 1) {
             currentPage--;
@@ -275,7 +294,6 @@ function showScreen(screen) {
           }
         });
 
-        // Export to CSV
         document.getElementById('export-csv').addEventListener('click', () => {
           let csvContent = 'ID,Type,Cash In,Cash Out,Timestamp,Items\n';
           filteredTransactions.forEach(([id, tx]) => {
@@ -293,7 +311,6 @@ function showScreen(screen) {
           window.URL.revokeObjectURL(url);
         });
 
-        // Toggle items
         function bindToggleEvents() {
           document.querySelectorAll('.toggle-items').forEach(button => {
             button.addEventListener('click', () => {
@@ -307,7 +324,6 @@ function showScreen(screen) {
         }
         bindToggleEvents();
 
-        // Apply all filters
         function applyFilters() {
           let filtered = allTransactions;
           if (searchTerm) {
@@ -343,8 +359,8 @@ function showScreen(screen) {
 
 function renderSellTab(inventory, total) {
   console.log('Rendering Sell tab with:', { inventory, total });
-  const totalListed = sellCart.reduce((sum, item) => sum + parseFloat(item.price), 0);
-  const totalNegotiated = sellCart.reduce((sum, item) => sum + parseFloat(item.negotiatedPrice || item.price), 0);
+  const totalListed = sellCart.reduce((sum, item) => sum + item.price, 0);
+  const totalNegotiated = sellCart.reduce((sum, item) => sum + (item.negotiatedPrice || item.price), 0);
   const totalPages = Math.ceil(total / itemsPerPage);
   document.getElementById('content').innerHTML = `
     <h3>Sell to Customer</h3>
@@ -380,17 +396,19 @@ function renderSellTab(inventory, total) {
       <p>Total Listed: ${cleanPrice(totalListed.toFixed(2))}</p>
       <p>Total Negotiated: ${cleanPrice(totalNegotiated.toFixed(2))}</p>
       <button onclick="completeSellTransaction()">Complete Sell</button>
+      <button id="clear-sell-cart">Clear Cart</button>
     </div>
   `;
   document.getElementById('sell-search').addEventListener('input', debounce((e) => {
     sellSearchTerm = e.target.value;
     fetchInventory('sell', 1, sellSearchTerm);
   }, 600));
+  document.getElementById('clear-sell-cart').addEventListener('click', clearSellCart);
 }
 
 function renderTradeTab(inventory, total) {
-  const tradeInTotal = tradeInCart.reduce((sum, item) => sum + parseFloat(item.tradeValue), 0);
-  const tradeOutTotal = tradeOutCart.reduce((sum, item) => sum + parseFloat(item.negotiatedPrice || item.price), 0);
+  const tradeInTotal = tradeInCart.reduce((sum, item) => sum + item.tradeValue, 0);
+  const tradeOutTotal = tradeOutCart.reduce((sum, item) => sum + (item.negotiatedPrice || item.price), 0);
   const cashDue = Math.max(tradeOutTotal - tradeInTotal, 0);
   const cashBack = tradeInTotal > tradeOutTotal ? tradeInTotal - tradeOutTotal : 0;
   const totalPages = Math.ceil(total / itemsPerPage);
@@ -403,13 +421,13 @@ function renderTradeTab(inventory, total) {
           <div class="input-group">
             <label>Search TCG Card</label>
             <input id="trade-in-tcg-card-name" placeholder="e.g., Charizard" type="text">
-            <button onclick="fetchTcgCard('trade-in')">Fetch Card</button>
+            <button id="fetch-trade-in-card">Fetch Card</button>
           </div>
           <div id="tcg-modal-trade-in" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
             <div style="background: white; margin: 50px auto; padding: 20px; width: 80%; max-height: 80%; overflow-y: auto;">
               <h4>Select a Card</h4>
               <div id="tcg-card-list-trade-in" style="display: flex; flex-wrap: wrap; gap: 20px;"></div>
-              <button onclick="closeTcgModal('trade-in')">Close</button>
+              <button id="close-tcg-modal-trade-in">Close</button>
             </div>
           </div>
           <div class="input-group">
@@ -462,6 +480,7 @@ function renderTradeTab(inventory, total) {
             `).join('')}
           </ul>
           <p>Total Trade-In Value: ${cleanPrice(tradeInTotal.toFixed(2))}</p>
+          <button id="clear-trade-in-cart">Clear Cart</button>
         </div>
       </div>
       <div class="trade-section trade-out">
@@ -498,6 +517,7 @@ function renderTradeTab(inventory, total) {
           <p>Cash Due: ${cleanPrice(cashDue.toFixed(2))}</p>
           ${cashBack > 0 ? `<p>Cash Back: ${cleanPrice(cashBack.toFixed(2))}</p>` : ''}
           <button onclick="completeTradeTransaction()">Complete Trade</button>
+          <button id="clear-trade-out-cart">Clear Cart</button>
         </div>
       </div>
     </div>
@@ -506,6 +526,10 @@ function renderTradeTab(inventory, total) {
     tradeOutSearchTerm = e.target.value;
     fetchInventory('trade-out', 1, tradeOutSearchTerm);
   }, 600));
+  document.getElementById('fetch-trade-in-card').addEventListener('click', () => fetchTcgCard('trade-in'));
+  document.getElementById('close-tcg-modal-trade-in').addEventListener('click', () => closeTcgModal('trade-in'));
+  document.getElementById('clear-trade-in-cart').addEventListener('click', clearTradeInCart);
+  document.getElementById('clear-trade-out-cart').addEventListener('click', clearTradeOutCart);
 }
 
 function fetchInventory(context, page, searchTerm) {
