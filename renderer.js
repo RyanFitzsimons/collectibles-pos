@@ -12,11 +12,13 @@ const itemsPerPage = 50;
 let sellSearchTerm = '';
 let tradeOutSearchTerm = '';
 
+// Format a number as a currency string with £ symbol
 function cleanPrice(price) {
   console.log('Cleaning price:', price, '->', Number(price).toFixed(2));
   return `\u00A3${Number(price).toFixed(2)}`; // Use Unicode £
 }
 
+// Debounce a function to limit how often it runs (e.g., for search inputs)
 function debounce(func, wait) {
   let timeout;
   return function executedFunction(...args) {
@@ -29,6 +31,7 @@ function debounce(func, wait) {
   };
 }
 
+// Render the main UI screen based on the selected tab
 function showScreen(screen) {
   console.log('Showing screen:', screen, { sellCart, tradeInCart, tradeOutCart, buyItems });
   const content = document.getElementById('content');
@@ -605,7 +608,7 @@ function showScreen(screen) {
   }
 }
 
-
+// Fetch inventory data from main process for Sell or Trade-Out tabs
 function fetchInventory(context, page, searchTerm) {
   ipcRenderer.send('get-inventory', { page, limit: itemsPerPage, search: searchTerm });
   ipcRenderer.once('inventory-data', (event, { items, total }) => {
@@ -619,6 +622,7 @@ function fetchInventory(context, page, searchTerm) {
   });
 }
 
+// Render the Sell tab UI with inventory and cart
 function renderSellTab(inventory, total) {
   console.log('Rendering Sell tab with:', { inventory, total });
   const totalListed = sellCart.reduce((sum, item) => sum + item.price, 0);
@@ -669,6 +673,7 @@ function renderSellTab(inventory, total) {
   document.getElementById('clear-sell-cart').addEventListener('click', clearSellCart);
 }
 
+// Render the Trade tab UI with Trade-In and Trade-Out sections
 function renderTradeTab(inventory, total) {
   const tradeInTotal = tradeInCart.reduce((sum, item) => sum + item.tradeValue, 0);
   const tradeOutTotal = tradeOutCart.reduce((sum, item) => sum + (parseFloat(item.negotiatedPrice) || item.price), 0);
@@ -796,13 +801,14 @@ function renderTradeTab(inventory, total) {
   document.getElementById('clear-trade-out-cart').addEventListener('click', clearTradeOutCart);
 }
 
-
+// Add an item from inventory to the Sell cart
 function addToSellCart(id, name, price, image_url, card_set, condition, button) {
   console.log('Adding to sell cart:', { id, name, price, image_url, card_set, condition });
   sellCart.push({ id, name, price, image_url: decodeURIComponent(image_url), card_set, condition, role: 'sold' });
   fetchInventory('sell', sellPage, sellSearchTerm);
 }
 
+// Update the negotiated price for an item in the Sell cart
 function updateSellPrice(id, value) {
   const index = sellCart.findIndex(item => item.id === id);
   if (index !== -1) {
@@ -812,6 +818,7 @@ function updateSellPrice(id, value) {
   fetchInventory('sell', sellPage, sellSearchTerm); // Re-fetch to re-render with updated total
 }
 
+// Add a manual item to the Trade-In cart and inventory
 function addToTradeInCart() {
   const conditionCategory = document.getElementById('trade-in-condition-category').value;
   const conditionValue = document.getElementById('trade-in-condition-value').value;
@@ -835,12 +842,14 @@ function addToTradeInCart() {
   ipcRenderer.once('add-item-error', (event, error) => console.error('Add item failed:', error));
 }
 
+// Add an item from inventory to the Trade-Out cart
 function addToTradeOutCart(id, name, price, image_url, card_set, condition, button) {
   console.log('Adding to trade-out cart:', { id, name, price, image_url, card_set, condition });
   tradeOutCart.push({ id, name, price, image_url: decodeURIComponent(image_url), card_set, condition, role: 'trade_out' });
   fetchInventory('trade-out', tradeOutPage, tradeOutSearchTerm);
 }
 
+// Update the negotiated price for an item in the Trade-Out cart
 function updateTradeOutPrice(id, value) {
   const index = tradeOutCart.findIndex(item => item.id === id);
   if (index !== -1) {
@@ -850,6 +859,7 @@ function updateTradeOutPrice(id, value) {
   fetchInventory('trade-out', tradeOutPage, tradeOutSearchTerm); // Re-fetch to re-render with updated total
 }
 
+// Fetch TCG card data from API or DB for Buy/Trade-In selection
 function fetchTcgCard(context) {
   const input = document.getElementById(`${context}-tcg-card-name`);
   if (!input) {
@@ -897,6 +907,7 @@ function fetchTcgCard(context) {
   ipcRenderer.once('tcg-card-error', (event, error) => console.error(`TCG card fetch failed for ${context}:`, error));
 }
 
+// Populate Buy/Trade-In form with selected TCG card data
 function selectTcgCard(card, context) {
   console.log(`Selected TCG card for ${context}:`, card);
   const prefix = context === 'trade-in' ? 'trade-in' : context;
@@ -930,10 +941,12 @@ function selectTcgCard(card, context) {
   closeTcgModal(context);
 }
 
+// Hide the TCG card selection modal
 function closeTcgModal(context) {
   document.getElementById(`tcg-modal-${context}`).style.display = 'none';
 }
 
+// Complete a Sell transaction and clear the cart
 function completeSellTransaction() {
   console.log('Completing sell transaction:', { sellCart });
   const items = sellCart.slice();
@@ -948,6 +961,7 @@ function completeSellTransaction() {
   ipcRenderer.once('transaction-error', (event, error) => console.error('Sell transaction failed:', error));
 }
 
+// Complete a Buy transaction and clear the cart
 function completeBuyTransaction() {
   console.log('Completing buy transaction:', { buyItems });
   const items = buyItems.slice();
@@ -962,6 +976,7 @@ function completeBuyTransaction() {
   ipcRenderer.once('transaction-error', (event, error) => console.error('Buy transaction failed:', error));
 }
 
+// Complete a Trade transaction and clear both carts
 function completeTradeTransaction() {
   console.log('Completing trade transaction:', { tradeInCart, tradeOutCart });
   const items = [...tradeInCart, ...tradeOutCart];
@@ -977,6 +992,7 @@ function completeTradeTransaction() {
   ipcRenderer.once('transaction-error', (event, error) => console.error('Trade transaction failed:', error));
 }
 
+// Add a manual item to the Buy cart and inventory
 function addToBuy() {
   const conditionCategory = document.getElementById('buy-condition-category').value;
   const conditionValue = document.getElementById('buy-condition-value').value;
@@ -1001,25 +1017,29 @@ function addToBuy() {
   ipcRenderer.once('add-item-error', (event, error) => console.error('Add item failed:', error));
 }
 
+// Clear the Sell cart and refresh the tab
 function clearSellCart() {
   sellCart.length = 0;
   fetchInventory('sell', sellPage, sellSearchTerm);
 }
 
+// Clear the Buy cart and refresh the tab
 function clearBuyCart() {
   buyItems.length = 0;
   showScreen('buy');
 }
 
+// Clear the Trade-In cart and refresh the tab
 function clearTradeInCart() {
   tradeInCart.length = 0;
   fetchInventory('trade-out', tradeOutPage, tradeOutSearchTerm);
 }
 
+// Clear the Trade-Out cart and refresh the tab
 function clearTradeOutCart() {
   tradeOutCart.length = 0;
   fetchInventory('trade-out', tradeOutPage, tradeOutSearchTerm);
 }
 
-// Initial render
+// Initial render of the Sell tab on app start
 showScreen('sell');
