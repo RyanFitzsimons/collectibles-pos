@@ -27,6 +27,10 @@ db.serialize(() => {
     if (err) console.error('Error creating transaction_items table:', err);
     else console.log('Transaction_items table created or already exists');
   });
+  db.run('CREATE TABLE IF NOT EXISTS cash_reconciliations (id TEXT PRIMARY KEY, date TEXT, starting_cash REAL, total_cash_in REAL, total_cash_out REAL, expected_cash REAL, actual_cash REAL, discrepancy REAL)', (err) => {
+    if (err) console.error('Error creating cash_reconciliations table:', err);
+    else console.log('Cash_reconciliations table created or already exists');
+  });
 });
 
 let mainWindow;
@@ -254,6 +258,52 @@ ipcMain.on('get-transactions', (event) => {
       event.sender.send('transactions-data', rows);
     }
   });
+});
+
+// New handler for fetching cash totals
+ipcMain.on('get-cash-totals', (event, { startDate = '', endDate = '' } = {}) => {
+  let query = 'SELECT SUM(cash_in) AS total_cash_in, SUM(cash_out) AS total_cash_out FROM transactions';
+  let params = [];
+  if (startDate || endDate) {
+    query += ' WHERE';
+    if (startDate) {
+      query += ' timestamp >= ?';
+      params.push(startDate);
+    }
+    if (endDate) {
+      query += startDate ? ' AND timestamp <= ?' : ' timestamp <= ?';
+      params.push(endDate);
+    }
+  }
+  db.get(query, params, (err, row) => {
+    if (err) {
+      console.error('Error fetching cash totals:', err);
+      event.reply('cash-totals-error', err.message);
+    } else {
+      console.log('Cash totals fetched:', row);
+      event.reply('cash-totals-data', {
+        total_cash_in: row.total_cash_in || 0,
+        total_cash_out: row.total_cash_out || 0
+      });
+    }
+  });
+});
+
+// New handler for saving reconciliation
+ipcMain.on('save-reconciliation', (event, reconciliation) => {
+  const id = Date.now().toString();
+  db.run('INSERT INTO cash_reconciliations (id, date, starting_cash, total_cash_in, total_cash_out, expected_cash, actual_cash, discrepancy) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    [id, reconciliation.date, reconciliation.starting_cash, reconciliation.total_cash_in, reconciliation.total_cash_out, reconciliation.expected_cash, reconciliation.actual_cash, reconciliation.discrepancy],
+    (err) => {
+      if (err) {
+        console.error('Error saving reconciliation:', err);
+        event.reply('reconciliation-error', err.message);
+      } else {
+        console.log('Reconciliation saved:', id);
+        event.reply('reconciliation-success', { id, ...reconciliation });
+      }
+    }
+  );
 });
 
 ipcMain.on('get-tcg-card', (event, cardName) => {
