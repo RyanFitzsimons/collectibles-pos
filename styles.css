@@ -406,11 +406,11 @@
   }
   
   .inventory-table th.asc::after {
-    content: ' ↑';
+    content: '\2191'; /* Unicode ↑ */
   }
   
   .inventory-table th:not(.asc)::after {
-    content: ' ↓';
+    content: '\2193'; /* Unicode ↓ */
   }
   
   .inventory-table input:disabled {
