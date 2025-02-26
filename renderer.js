@@ -622,7 +622,7 @@ function fetchInventory(context, page, searchTerm) {
 function renderSellTab(inventory, total) {
   console.log('Rendering Sell tab with:', { inventory, total });
   const totalListed = sellCart.reduce((sum, item) => sum + item.price, 0);
-  const totalNegotiated = sellCart.reduce((sum, item) => sum + (item.negotiatedPrice || item.price), 0);
+  const totalNegotiated = sellCart.reduce((sum, item) => sum + (parseFloat(item.negotiatedPrice) || item.price), 0);
   const totalPages = Math.ceil(total / itemsPerPage);
   document.getElementById('content').innerHTML = `
     <h3>Sell to Customer</h3>
@@ -633,7 +633,8 @@ function renderSellTab(inventory, total) {
         ${inventory.map(item => `
           <li>
             ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}">` : ''}
-            ${item.name} (${item.card_set || 'Unknown Set'}) - ${cleanPrice(item.price)} (${item.condition || 'Not Set'}) <button onclick="addToSellCart('${item.id}', '${item.name}', ${item.price}, '${item.image_url || ''}', '${item.card_set || ''}', '${item.condition || ''}')">Add</button>
+            ${item.name} (${item.card_set || 'Unknown Set'}) - ${cleanPrice(item.price)} (${item.condition || 'Not Set'}) 
+            <button onclick="addToSellCart('${item.id}', '${item.name}', ${item.price}, '${encodeURIComponent(item.image_url || '')}', '${item.card_set || ''}', '${item.condition || ''}', this)">Add</button>
           </li>
         `).join('')}
       </ul>
@@ -648,9 +649,9 @@ function renderSellTab(inventory, total) {
       <ul id="sell-cart-items">
         ${sellCart.map(item => `
           <li>
-            ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}" style="max-width: 50px;">` : ''}
+            ${item.image_url ? `<img src="${decodeURIComponent(item.image_url)}" alt="${item.name}" style="max-width: 50px;">` : 'No Image'}
             ${item.name} (${item.card_set || 'Unknown Set'}) - 
-            <input type="number" value="${item.negotiatedPrice}" onchange="updateSellPrice('${item.id}', this.value)" style="width: 60px;">
+            <input type="number" value="${item.negotiatedPrice || item.price}" onchange="updateSellPrice('${item.id}', this.value)" style="width: 60px;">
             (Original: ${cleanPrice(item.price)}, ${item.condition || 'Not Set'})
           </li>
         `).join('')}
@@ -670,7 +671,7 @@ function renderSellTab(inventory, total) {
 
 function renderTradeTab(inventory, total) {
   const tradeInTotal = tradeInCart.reduce((sum, item) => sum + item.tradeValue, 0);
-  const tradeOutTotal = tradeOutCart.reduce((sum, item) => sum + (item.negotiatedPrice || item.price), 0);
+  const tradeOutTotal = tradeOutCart.reduce((sum, item) => sum + (parseFloat(item.negotiatedPrice) || item.price), 0);
   const cashDue = Math.max(tradeOutTotal - tradeInTotal, 0);
   const cashBack = tradeInTotal > tradeOutTotal ? tradeInTotal - tradeOutTotal : 0;
   const totalPages = Math.ceil(total / itemsPerPage);
@@ -753,7 +754,8 @@ function renderTradeTab(inventory, total) {
             ${inventory.map(item => `
               <li>
                 ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}">` : ''}
-                ${item.name} (${item.card_set || 'Unknown Set'}) - ${cleanPrice(item.price)} (${item.condition || 'Not Set'}) <button onclick="addToTradeOutCart('${item.id}', '${item.name}', ${item.price}, '${item.image_url || ''}', '${item.card_set || ''}', '${item.condition || ''}')">Add</button>
+                ${item.name} (${item.card_set || 'Unknown Set'}) - ${cleanPrice(item.price)} (${item.condition || 'Not Set'}) 
+                <button onclick="addToTradeOutCart('${item.id}', '${item.name}', ${item.price}, '${encodeURIComponent(item.image_url || '')}', '${item.card_set || ''}', '${item.condition || ''}', this)">Add</button>
               </li>
             `).join('')}
           </ul>
@@ -768,9 +770,9 @@ function renderTradeTab(inventory, total) {
           <ul id="trade-out-items">
             ${tradeOutCart.map(item => `
               <li>
-                ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}" style="max-width: 50px;">` : ''}
+                ${item.image_url ? `<img src="${decodeURIComponent(item.image_url)}" alt="${item.name}" style="max-width: 50px;">` : 'No Image'}
                 ${item.name} (${item.card_set || 'Unknown Set'}) - 
-                <input type="number" value="${item.negotiatedPrice}" onchange="updateTradeOutPrice('${item.id}', this.value)" style="width: 60px;">
+                <input type="number" value="${item.negotiatedPrice || item.price}" onchange="updateTradeOutPrice('${item.id}', this.value)" style="width: 60px;">
                 (Original: ${cleanPrice(item.price)}, ${item.condition || 'Not Set'})
               </li>
             `).join('')}
@@ -794,15 +796,20 @@ function renderTradeTab(inventory, total) {
   document.getElementById('clear-trade-out-cart').addEventListener('click', clearTradeOutCart);
 }
 
-function addToSellCart(id, name, price, image_url, card_set, condition) {
-  sellCart.push({ id, name, price, image_url, card_set, condition, role: 'sold' });
-  renderSellTab(inventory, totalPages);
+
+function addToSellCart(id, name, price, image_url, card_set, condition, button) {
+  console.log('Adding to sell cart:', { id, name, price, image_url, card_set, condition });
+  sellCart.push({ id, name, price, image_url: decodeURIComponent(image_url), card_set, condition, role: 'sold' });
+  fetchInventory('sell', sellPage, sellSearchTerm);
 }
 
 function updateSellPrice(id, value) {
   const index = sellCart.findIndex(item => item.id === id);
-  if (index !== -1) sellCart[index].negotiatedPrice = parseFloat(value) || sellCart[index].price;
-  renderSellTab(inventory, totalPages);
+  if (index !== -1) {
+    sellCart[index].negotiatedPrice = parseFloat(value) || sellCart[index].price;
+    console.log('Updated sell price:', sellCart[index]);
+  }
+  fetchInventory('sell', sellPage, sellSearchTerm); // Re-fetch to re-render with updated total
 }
 
 function addToTradeInCart() {
@@ -828,15 +835,19 @@ function addToTradeInCart() {
   ipcRenderer.once('add-item-error', (event, error) => console.error('Add item failed:', error));
 }
 
-function addToTradeOutCart(id, name, price, image_url, card_set, condition) {
-  tradeOutCart.push({ id, name, price, image_url, card_set, condition, role: 'trade_out' });
-  renderTradeTab(inventory, totalPages);
+function addToTradeOutCart(id, name, price, image_url, card_set, condition, button) {
+  console.log('Adding to trade-out cart:', { id, name, price, image_url, card_set, condition });
+  tradeOutCart.push({ id, name, price, image_url: decodeURIComponent(image_url), card_set, condition, role: 'trade_out' });
+  fetchInventory('trade-out', tradeOutPage, tradeOutSearchTerm);
 }
 
 function updateTradeOutPrice(id, value) {
   const index = tradeOutCart.findIndex(item => item.id === id);
-  if (index !== -1) tradeOutCart[index].negotiatedPrice = parseFloat(value) || tradeOutCart[index].price;
-  renderTradeTab(inventory, totalPages);
+  if (index !== -1) {
+    tradeOutCart[index].negotiatedPrice = parseFloat(value) || tradeOutCart[index].price;
+    console.log('Updated trade-out price:', tradeOutCart[index]);
+  }
+  fetchInventory('trade-out', tradeOutPage, tradeOutSearchTerm); // Re-fetch to re-render with updated total
 }
 
 function fetchTcgCard(context) {
