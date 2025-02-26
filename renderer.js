@@ -533,6 +533,10 @@ function showScreen(screen) {
               <label>Discrepancy (\u00A3)</label>
               <input id="reconcile-discrepancy" type="number" step="0.01" disabled>
             </div>
+            <div class="input-group">
+              <label>Notes</label>
+              <textarea id="reconcile-notes" placeholder="e.g., Short due to miscount" rows="3" style="width: 100%; padding: 8px;"></textarea>
+            </div>
             <button id="save-reconciliation">Save</button>
             <button id="close-reconciliation">Close</button>
           </div>
@@ -548,13 +552,26 @@ function showScreen(screen) {
       ipcRenderer.send('get-cash-totals', { startDate, endDate });
     });
 
-    ipcRenderer.once('cash-totals-data', (event, { total_cash_in, total_cash_out }) => {
-      const startingCash = parseFloat(document.getElementById('reconcile-starting-cash').value) || 0;
-      document.getElementById('reconcile-cash-in').value = total_cash_in.toFixed(2);
-      document.getElementById('reconcile-cash-out').value = total_cash_out.toFixed(2);
-      const expectedCash = startingCash + total_cash_in - total_cash_out;
-      document.getElementById('reconcile-expected-cash').value = expectedCash.toFixed(2);
-      updateDiscrepancy();
+    ipcRenderer.on('cash-totals-data', (event, { total_cash_in, total_cash_out }) => {
+      const startingCashInput = document.getElementById('reconcile-starting-cash');
+      const cashInInput = document.getElementById('reconcile-cash-in');
+      const cashOutInput = document.getElementById('reconcile-cash-out');
+      const expectedCashInput = document.getElementById('reconcile-expected-cash');
+      
+      cashInInput.value = total_cash_in.toFixed(2);
+      cashOutInput.value = total_cash_out.toFixed(2);
+      
+      function updateCalculations() {
+        const startingCash = parseFloat(startingCashInput.value) || 0;
+        const totalCashIn = parseFloat(cashInInput.value) || 0;
+        const totalCashOut = parseFloat(cashOutInput.value) || 0;
+        const expectedCash = startingCash + totalCashIn - totalCashOut;
+        expectedCashInput.value = expectedCash.toFixed(2);
+        updateDiscrepancy();
+      }
+
+      startingCashInput.addEventListener('input', updateCalculations);
+      updateCalculations(); // Initial calc
     });
 
     document.getElementById('reconcile-actual-cash').addEventListener('input', updateDiscrepancy);
@@ -567,7 +584,8 @@ function showScreen(screen) {
         total_cash_out: parseFloat(document.getElementById('reconcile-cash-out').value) || 0,
         expected_cash: parseFloat(document.getElementById('reconcile-expected-cash').value) || 0,
         actual_cash: parseFloat(document.getElementById('reconcile-actual-cash').value) || 0,
-        discrepancy: parseFloat(document.getElementById('reconcile-discrepancy').value) || 0
+        discrepancy: parseFloat(document.getElementById('reconcile-discrepancy').value) || 0,
+        notes: document.getElementById('reconcile-notes').value || ''
       };
       ipcRenderer.send('save-reconciliation', reconciliation);
       ipcRenderer.once('reconciliation-success', () => {

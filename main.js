@@ -27,7 +27,7 @@ db.serialize(() => {
     if (err) console.error('Error creating transaction_items table:', err);
     else console.log('Transaction_items table created or already exists');
   });
-  db.run('CREATE TABLE IF NOT EXISTS cash_reconciliations (id TEXT PRIMARY KEY, date TEXT, starting_cash REAL, total_cash_in REAL, total_cash_out REAL, expected_cash REAL, actual_cash REAL, discrepancy REAL)', (err) => {
+  db.run('CREATE TABLE IF NOT EXISTS cash_reconciliations (id TEXT PRIMARY KEY, date TEXT, starting_cash REAL, total_cash_in REAL, total_cash_out REAL, expected_cash REAL, actual_cash REAL, discrepancy REAL, notes TEXT)', (err) => {
     if (err) console.error('Error creating cash_reconciliations table:', err);
     else console.log('Cash_reconciliations table created or already exists');
   });
@@ -292,8 +292,8 @@ ipcMain.on('get-cash-totals', (event, { startDate = '', endDate = '' } = {}) => 
 // New handler for saving reconciliation
 ipcMain.on('save-reconciliation', (event, reconciliation) => {
   const id = Date.now().toString();
-  db.run('INSERT INTO cash_reconciliations (id, date, starting_cash, total_cash_in, total_cash_out, expected_cash, actual_cash, discrepancy) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-    [id, reconciliation.date, reconciliation.starting_cash, reconciliation.total_cash_in, reconciliation.total_cash_out, reconciliation.expected_cash, reconciliation.actual_cash, reconciliation.discrepancy],
+  db.run('INSERT INTO cash_reconciliations (id, date, starting_cash, total_cash_in, total_cash_out, expected_cash, actual_cash, discrepancy, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+    [id, reconciliation.date, reconciliation.starting_cash, reconciliation.total_cash_in, reconciliation.total_cash_out, reconciliation.expected_cash, reconciliation.actual_cash, reconciliation.discrepancy, reconciliation.notes],
     (err) => {
       if (err) {
         console.error('Error saving reconciliation:', err);
