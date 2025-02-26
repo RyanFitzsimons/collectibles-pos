@@ -4,50 +4,29 @@ let sellCart = [];
 let tradeInCart = [];
 let tradeOutCart = [];
 let buyItems = [];
-let currentInventory = [];
+
 let sellPage = 1;
 let tradeOutPage = 1;
-const itemsPerPage = 5;
-let sellTotal = 0;
-let tradeOutTotal = 0;
+const itemsPerPage = 50;
+
 let sellSearchTerm = '';
 let tradeOutSearchTerm = '';
 
-// Debounce function to limit search frequency
+function cleanPrice(price) {
+  console.log('Cleaning price:', price, '->', Number(price).toFixed(2));
+  return `\u00A3${Number(price).toFixed(2)}`; // Use Unicode £
+}
+
 function debounce(func, wait) {
   let timeout;
-  return function (...args) {
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout);
+      func(...args);
+    };
     clearTimeout(timeout);
-    timeout = setTimeout(() => func.apply(this, args), wait);
+    timeout = setTimeout(later, wait);
   };
-}
-
-// Enhanced cleanPrice with explicit £
-function cleanPrice(price) {
-  const raw = String(price);
-  const cleaned = raw.replace(/[^0-9.]/g, ''); // Only numbers and decimals
-  console.log(`Cleaning price: "${raw}" -> "${cleaned}"`); // Debug log
-  return `\u00A3${cleaned}`; // Unicode £
-}
-
-function clearBuyCart() {
-  buyItems.length = 0;
-  showScreen('buy');
-}
-
-function clearSellCart() {
-  sellCart.length = 0;
-  showScreen('sell');
-}
-
-function clearTradeInCart() {
-  tradeInCart.length = 0;
-  showScreen('trade');
-}
-
-function clearTradeOutCart() {
-  tradeOutCart.length = 0;
-  showScreen('trade');
 }
 
 function showScreen(screen) {
@@ -358,7 +337,179 @@ function showScreen(screen) {
 
       renderTransactions(sortedTransactions);
     });
+  } else if (screen === 'inventory') {
+    ipcRenderer.send('get-all-inventory');
+    ipcRenderer.once('all-inventory-data', (event, { items, total }) => {
+      let allItems = items;
+      let sortedItems = allItems.sort((a, b) => a.name.localeCompare(b.name));
+      let currentSortKey = 'name';
+      let isAsc = true;
+      let searchTerm = '';
+      let currentPage = 1;
+      const itemsPerPage = 10;
+
+      function renderInventory(filteredItems) {
+        const totalPages = Math.ceil(filteredItems.length / itemsPerPage);
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const paginatedItems = filteredItems.slice(startIndex, startIndex + itemsPerPage);
+
+        content.innerHTML = `
+          <div class="section">
+            <h3>Inventory</h3>
+            <div class="input-group">
+              <label>Filter Inventory</label>
+              <input id="inventory-search" type="text" placeholder="Search by Name or Set" value="${searchTerm}">
+            </div>
+            <table class="inventory-table">
+              <thead>
+                <tr>
+                  <th data-sort="id">ID</th>
+                  <th data-sort="name">Name</th>
+                  <th data-sort="price">Price</th>
+                  <th>Trade Value</th>
+                  <th data-sort="stock">Stock</th>
+                  <th data-sort="condition">Condition</th>
+                  <th data-sort="card_set">Set</th>
+                  <th data-sort="rarity">Rarity</th>
+                  <th>Image</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${paginatedItems.map(item => `
+                  <tr>
+                    <td>${item.id}</td>
+                    <td><input id="name-${item.id}" value="${item.name}" disabled></td>
+                    <td><input id="price-${item.id}" type="number" value="${item.price}" disabled></td>
+                    <td>${cleanPrice(item.trade_value || Math.floor(item.price * 0.5))}</td>
+                    <td>${item.stock}</td>
+                    <td><input id="condition-${item.id}" value="${item.condition || ''}" disabled></td>
+                    <td><input id="card_set-${item.id}" value="${item.card_set || ''}" disabled></td>
+                    <td><input id="rarity-${item.id}" value="${item.rarity || ''}" disabled></td>
+                    <td>${item.image_url ? `<img src="${item.image_url}" alt="${item.name}" style="max-width: 50px;">` : 'No Image'}</td>
+                    <td>
+                      <button class="edit-item" data-id="${item.id}">Edit</button>
+                      <button class="save-item" data-id="${item.id}" style="display: none;">Save</button>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+            <div class="pagination">
+              <button id="prev-page" ${currentPage === 1 ? 'disabled' : ''}>Previous</button>
+              <span>Page ${currentPage} of ${totalPages}</span>
+              <button id="next-page" ${currentPage >= totalPages ? 'disabled' : ''}>Next</button>
+            </div>
+          </div>
+        `;
+
+        const table = document.querySelector('.inventory-table');
+        table.querySelectorAll('th[data-sort]').forEach(th => {
+          th.addEventListener('click', () => {
+            const key = th.dataset.sort;
+            if (key === currentSortKey) isAsc = !isAsc;
+            else {
+              currentSortKey = key;
+              isAsc = true;
+            }
+            sortedItems.sort((a, b) => {
+              const aVal = a[key] || '';
+              const bVal = b[key] || '';
+              return isAsc ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+            });
+            th.classList.toggle('asc', isAsc);
+            renderInventory(sortedItems);
+          });
+        });
+
+        document.getElementById('inventory-search').addEventListener('input', debounce((e) => {
+          searchTerm = e.target.value.toLowerCase();
+          applyFilters();
+        }, 600));
+
+        document.getElementById('prev-page').addEventListener('click', () => {
+          if (currentPage > 1) {
+            currentPage--;
+            renderInventory(sortedItems);
+          }
+        });
+        document.getElementById('next-page').addEventListener('click', () => {
+          if (currentPage < totalPages) {
+            currentPage++;
+            renderInventory(sortedItems);
+          }
+        });
+
+        document.querySelectorAll('.edit-item').forEach(button => {
+          button.addEventListener('click', () => {
+            const id = button.dataset.id;
+            button.style.display = 'none';
+            document.querySelector(`.save-item[data-id="${id}"]`).style.display = 'inline';
+            ['name', 'price', 'condition', 'card_set', 'rarity'].forEach(field => {
+              document.getElementById(`${field}-${id}`).disabled = false;
+            });
+          });
+        });
+
+        document.querySelectorAll('.save-item').forEach(button => {
+          button.addEventListener('click', () => {
+            const id = button.dataset.id;
+            const updatedItem = {
+              id,
+              name: document.getElementById(`name-${id}`).value,
+              price: parseFloat(document.getElementById(`price-${id}`).value) || 0,
+              condition: document.getElementById(`condition-${id}`).value,
+              card_set: document.getElementById(`card_set-${id}`).value,
+              rarity: document.getElementById(`rarity-${id}`).value
+            };
+            ipcRenderer.send('update-inventory-item', updatedItem);
+            ipcRenderer.once('update-inventory-success', () => {
+              button.style.display = 'none';
+              document.querySelector(`.edit-item[data-id="${id}"]`).style.display = 'inline';
+              ['name', 'price', 'condition', 'card_set', 'rarity'].forEach(field => {
+                document.getElementById(`${field}-${id}`).disabled = true;
+              });
+              allItems = allItems.map(i => i.id === id ? { ...i, ...updatedItem } : i);
+              renderInventory(allItems);
+            });
+            ipcRenderer.once('update-inventory-error', (event, error) => console.error('Update failed:', error));
+          });
+        });
+      }
+
+      function applyFilters() {
+        let filtered = allItems;
+        if (searchTerm) {
+          filtered = filtered.filter(item => 
+            item.name.toLowerCase().includes(searchTerm) || 
+            (item.card_set || '').toLowerCase().includes(searchTerm)
+          );
+        }
+        sortedItems = filtered.sort((a, b) => {
+          const aVal = a[currentSortKey] || '';
+          const bVal = b[currentSortKey] || '';
+          return isAsc ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+        });
+        currentPage = 1;
+        renderInventory(sortedItems);
+      }
+
+      renderInventory(allItems);
+    });
   }
+}
+
+function fetchInventory(context, page, searchTerm) {
+  ipcRenderer.send('get-inventory', { page, limit: itemsPerPage, search: searchTerm });
+  ipcRenderer.once('inventory-data', (event, { items, total }) => {
+    if (context === 'sell') {
+      renderSellTab(items, total);
+      sellPage = page;
+    } else if (context === 'trade-out') {
+      renderTradeTab(items, total);
+      tradeOutPage = page;
+    }
+  });
 }
 
 function renderSellTab(inventory, total) {
@@ -397,7 +548,7 @@ function renderSellTab(inventory, total) {
           </li>
         `).join('')}
       </ul>
-      <p>Total Listed: ${cleanPrice(totalListed.toFixed(2))}</p>
+      <p>Total Listed: ${cleanPrice(totalListed.toFixed(2))}, Items: ${sellCart.length}</p>
       <p>Total Negotiated: ${cleanPrice(totalNegotiated.toFixed(2))}</p>
       <button onclick="completeSellTransaction()">Complete Sell</button>
       <button id="clear-sell-cart">Clear Cart</button>
@@ -483,7 +634,7 @@ function renderTradeTab(inventory, total) {
               </li>
             `).join('')}
           </ul>
-          <p>Total Trade-In Value: ${cleanPrice(tradeInTotal.toFixed(2))}</p>
+          <p>Total Trade-In Value: ${cleanPrice(tradeInTotal.toFixed(2))}, Items: ${tradeInCart.length}</p>
           <button id="clear-trade-in-cart">Clear Cart</button>
         </div>
       </div>
@@ -517,7 +668,7 @@ function renderTradeTab(inventory, total) {
               </li>
             `).join('')}
           </ul>
-          <p>Total Trade-Out Value: ${cleanPrice(tradeOutTotal.toFixed(2))}</p>
+          <p>Total Trade-Out Value: ${cleanPrice(tradeOutTotal.toFixed(2))}, Items: ${tradeOutCart.length}</p>
           <p>Cash Due: ${cleanPrice(cashDue.toFixed(2))}</p>
           ${cashBack > 0 ? `<p>Cash Back: ${cleanPrice(cashBack.toFixed(2))}</p>` : ''}
           <button onclick="completeTradeTransaction()">Complete Trade</button>
@@ -536,85 +687,49 @@ function renderTradeTab(inventory, total) {
   document.getElementById('clear-trade-out-cart').addEventListener('click', clearTradeOutCart);
 }
 
-function fetchInventory(context, page, searchTerm) {
-  if (page < 1) return;
-  ipcRenderer.send('get-inventory', { page, limit: itemsPerPage, search: searchTerm });
-  ipcRenderer.once('inventory-data', (event, { items, total }) => {
-    currentInventory = items;
-    if (context === 'sell') {
-      sellPage = page;
-      sellTotal = total;
-      renderSellTab(items, total);
-    } else if (context === 'trade-out') {
-      tradeOutPage = page;
-      tradeOutTotal = total;
-      renderTradeTab(items, total);
-    }
-  });
+function addToSellCart(id, name, price, image_url, card_set, condition) {
+  sellCart.push({ id, name, price, image_url, card_set, condition, role: 'sold' });
+  renderSellTab(inventory, totalPages);
 }
 
-function addToSellCart(id, name, price, imageUrl, card_set, condition) {
-  console.log('Adding to sell cart:', { id, name, price, imageUrl, card_set, condition });
-  sellCart.push({ id, name, price, negotiatedPrice: price, image_url: imageUrl, card_set, condition, role: 'sold' });
-  showScreen('sell');
+function updateSellPrice(id, value) {
+  const index = sellCart.findIndex(item => item.id === id);
+  if (index !== -1) sellCart[index].negotiatedPrice = parseFloat(value) || sellCart[index].price;
+  renderSellTab(inventory, totalPages);
 }
 
-function updateSellPrice(id, newPrice) {
-  console.log('Updating sell price:', { id, newPrice });
-  sellCart = sellCart.map(item => item.id === id ? { ...item, negotiatedPrice: parseFloat(newPrice) || item.price } : item);
-  showScreen('sell');
-}
-
-function completeSellTransaction() {
-  console.log('Completing sell transaction:', { sellCart });
-  const items = sellCart;
-  const cashIn = sellCart.reduce((sum, item) => sum + (item.negotiatedPrice || item.price), 0);
-  const cashOut = 0;
-  ipcRenderer.send('complete-transaction', { items, type: 'sell', cashIn, cashOut });
-  ipcRenderer.once('transaction-complete', () => {
-    console.log('Sell transaction completed');
-    sellCart = [];
-    showScreen('sell');
-  });
-  ipcRenderer.once('transaction-error', (event, error) => console.error('Sell transaction failed:', error));
-}
-
-function addToBuy() {
-  const name = document.getElementById('buy-name').value;
-  const type = document.getElementById('buy-type').value;
-  const price = parseFloat(document.getElementById('buy-price').value) || 0;
-  const tradeValue = parseFloat(document.getElementById('buy-trade-value').value) || 0;
-  const conditionCategory = document.getElementById('buy-condition-category').value || '';
-  const conditionValue = document.getElementById('buy-condition-value').value || '';
-  const condition = conditionCategory && conditionValue ? `${conditionCategory} - ${conditionValue}` : null;
-  const image = document.getElementById('buy-image').files[0];
-  const id = Date.now().toString();
-  const tcg_id = document.getElementById('buy-tcg-id').value || null;
-  const card_set = document.getElementById('buy-card-set').value || null;
-  const rarity = document.getElementById('buy-rarity').value || null;
-  const image_url = document.getElementById('buy-image-url').value || null;
-
-  console.log('Adding to buy:', { id, name, type, price, tradeValue, condition, image: image ? image.name : null, tcg_id, card_set, rarity, image_url });
-  ipcRenderer.send('add-item', {
-    id,
-    name,
-    type,
-    price,
-    tradeValue,
-    condition,
-    imagePath: image ? image.path : null,
-    imageName: image ? image.name : null,
-    image_url,
-    role: 'trade_in',
-    tcg_id,
-    card_set,
-    rarity
-  });
-  ipcRenderer.once('add-item-success', (event, item) => {
-    buyItems.push(item);
-    showScreen('buy');
-  });
+function addToTradeInCart() {
+  const conditionCategory = document.getElementById('trade-in-condition-category').value;
+  const conditionValue = document.getElementById('trade-in-condition-value').value;
+  const condition = conditionCategory ? `${conditionCategory}${conditionValue ? ' ' + conditionValue : ''}` : conditionValue;
+  const tradeInItem = {
+    id: Date.now().toString(),
+    name: document.getElementById('trade-in-name').value,
+    type: document.getElementById('trade-in-type').value,
+    price: parseFloat(document.getElementById('trade-in-price').value) || 0,
+    tradeValue: parseFloat(document.getElementById('trade-in-value').value) || 0,
+    condition: condition || null,
+    image_url: document.getElementById('trade-in-image-url').value || null,
+    tcg_id: document.getElementById('trade-in-tcg-id').value || null,
+    card_set: document.getElementById('trade-in-card-set').value || null,
+    rarity: document.getElementById('trade-in-rarity').value || null,
+    role: 'trade_in'
+  };
+  tradeInCart.push(tradeInItem);
+  ipcRenderer.send('add-item', tradeInItem);
+  ipcRenderer.once('add-item-success', () => renderTradeTab(inventory, totalPages));
   ipcRenderer.once('add-item-error', (event, error) => console.error('Add item failed:', error));
+}
+
+function addToTradeOutCart(id, name, price, image_url, card_set, condition) {
+  tradeOutCart.push({ id, name, price, image_url, card_set, condition, role: 'trade_out' });
+  renderTradeTab(inventory, totalPages);
+}
+
+function updateTradeOutPrice(id, value) {
+  const index = tradeOutCart.findIndex(item => item.id === id);
+  if (index !== -1) tradeOutCart[index].negotiatedPrice = parseFloat(value) || tradeOutCart[index].price;
+  renderTradeTab(inventory, totalPages);
 }
 
 function fetchTcgCard(context) {
@@ -654,7 +769,6 @@ function fetchTcgCard(context) {
     const modal = document.getElementById(`tcg-modal-${context}`);
     if (modal) modal.style.display = 'flex';
 
-    // Add event listeners for select buttons
     document.querySelectorAll(`#tcg-card-list-${context} .select-tcg-card`).forEach(button => {
       button.addEventListener('click', () => {
         const index = parseInt(button.dataset.index);
@@ -667,7 +781,7 @@ function fetchTcgCard(context) {
 
 function selectTcgCard(card, context) {
   console.log(`Selected TCG card for ${context}:`, card);
-  const prefix = context === 'trade-in' ? 'trade-in' : context; // Ensure correct prefix
+  const prefix = context === 'trade-in' ? 'trade-in' : context;
   const nameField = document.getElementById(`${prefix}-name`);
   const typeField = document.getElementById(`${prefix}-type`);
   const priceField = document.getElementById(`${prefix}-price`);
@@ -698,214 +812,96 @@ function selectTcgCard(card, context) {
   closeTcgModal(context);
 }
 
-function renderTradeTab(inventory, total) {
-  const tradeInTotal = tradeInCart.reduce((sum, item) => sum + item.tradeValue, 0);
-  const tradeOutTotal = tradeOutCart.reduce((sum, item) => sum + (item.negotiatedPrice || item.price), 0);
-  const cashDue = Math.max(tradeOutTotal - tradeInTotal, 0);
-  const cashBack = tradeInTotal > tradeOutTotal ? tradeInTotal - tradeOutTotal : 0;
-  const totalPages = Math.ceil(total / itemsPerPage);
-
-  document.getElementById('content').innerHTML = `
-    <div class="trade-container">
-      <div class="trade-section trade-in">
-        <div class="section">
-          <h3>Add Trade-In Item</h3>
-          <div class="input-group">
-            <label>Search TCG Card</label>
-            <input id="trade-in-tcg-card-name" placeholder="e.g., Charizard" type="text">
-            <button id="fetch-trade-in-card">Fetch Card</button>
-          </div>
-          <div id="tcg-modal-trade-in" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
-            <div style="background: white; margin: 50px auto; padding: 20px; width: 80%; max-height: 80%; overflow-y: auto;">
-              <h4>Select a Card</h4>
-              <div id="tcg-card-list-trade-in" style="display: flex; flex-wrap: wrap; gap: 20px;"></div>
-              <button id="close-tcg-modal-trade-in">Close</button>
-            </div>
-          </div>
-          <div class="input-group">
-            <label>Card Name</label>
-            <input id="trade-in-name" placeholder="Enter card name" type="text">
-          </div>
-          <div class="input-group">
-            <label>Type</label>
-            <input id="trade-in-type" placeholder="e.g., pokemon_card" type="text">
-          </div>
-          <div class="input-group">
-            <label>Market Price (\u00A3)</label>
-            <input id="trade-in-price" placeholder="Enter price" type="number">
-          </div>
-          <div class="input-group">
-            <label>Trade Value (\u00A3)</label>
-            <input id="trade-in-value" placeholder="Enter trade value" type="number">
-          </div>
-          <div class="input-group">
-            <label>Condition</label>
-            <select id="trade-in-condition-category">
-              <option value="">Select Category</option>
-              <option value="Raw">Raw</option>
-              <option value="PSA">PSA</option>
-              <option value="CGC">CGC</option>
-              <option value="BGS">BGS</option>
-              <option value="TAG">TAG</option>
-              <option value="Other">Other</option>
-            </select>
-            <input id="trade-in-condition-value" placeholder="e.g., NM, 7" type="text">
-          </div>
-          <div class="input-group">
-            <label>Image</label>
-            <input id="trade-in-image" type="file" accept="image/*">
-          </div>
-          <input id="trade-in-tcg-id" type="hidden">
-          <input id="trade-in-card-set" type="hidden">
-          <input id="trade-in-rarity" type="hidden">
-          <input id="trade-in-image-url" type="hidden">
-          <button onclick="addToTradeInCart()">Add Trade-In</button>
-        </div>
-        <div class="section">
-          <h3>Trade-In Cart</h3>
-          <ul id="trade-in-items">
-            ${tradeInCart.map(item => `
-              <li>
-                ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}" style="max-width: 50px;">` : ''}
-                ${item.name} (${item.card_set || 'Unknown Set'}) - ${cleanPrice(item.tradeValue)} (${item.condition || 'Not Set'})
-              </li>
-            `).join('')}
-          </ul>
-          <p>Total Trade-In Value: ${cleanPrice(tradeInTotal.toFixed(2))}</p>
-          <button id="clear-trade-in-cart">Clear Cart</button>
-        </div>
-      </div>
-      <div class="trade-section trade-out">
-        <div class="section">
-          <h3>Trade-Out Inventory</h3>
-          <input id="trade-out-search" type="text" placeholder="Search inventory (e.g., Charizard, Base Set)" value="${tradeOutSearchTerm}">
-          <ul id="trade-out-inventory-list">
-            ${inventory.map(item => `
-              <li>
-                ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}">` : ''}
-                ${item.name} (${item.card_set || 'Unknown Set'}) - ${cleanPrice(item.price)} (${item.condition || 'Not Set'}) <button onclick="addToTradeOutCart('${item.id}', '${item.name}', ${item.price}, '${item.image_url || ''}', '${item.card_set || ''}', '${item.condition || ''}')">Add</button>
-              </li>
-            `).join('')}
-          </ul>
-          <div>
-            <button onclick="fetchInventory('trade-out', ${tradeOutPage - 1}, tradeOutSearchTerm)" ${tradeOutPage === 1 ? 'disabled' : ''}>Previous</button>
-            <span>Page ${tradeOutPage} of ${totalPages}</span>
-            <button onclick="fetchInventory('trade-out', ${tradeOutPage + 1}, tradeOutSearchTerm)" ${tradeOutPage >= totalPages ? 'disabled' : ''}>Next</button>
-          </div>
-        </div>
-        <div class="section">
-          <h3>Trade-Out Cart</h3>
-          <ul id="trade-out-items">
-            ${tradeOutCart.map(item => `
-              <li>
-                ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}" style="max-width: 50px;">` : ''}
-                ${item.name} (${item.card_set || 'Unknown Set'}) - 
-                <input type="number" value="${item.negotiatedPrice}" onchange="updateTradeOutPrice('${item.id}', this.value)" style="width: 60px;">
-                (Original: ${cleanPrice(item.price)}, ${item.condition || 'Not Set'})
-              </li>
-            `).join('')}
-          </ul>
-          <p>Total Trade-Out Value: ${cleanPrice(tradeOutTotal.toFixed(2))}</p>
-          <p>Cash Due: ${cleanPrice(cashDue.toFixed(2))}</p>
-          ${cashBack > 0 ? `<p>Cash Back: ${cleanPrice(cashBack.toFixed(2))}</p>` : ''}
-          <button onclick="completeTradeTransaction()">Complete Trade</button>
-          <button id="clear-trade-out-cart">Clear Cart</button>
-        </div>
-      </div>
-    </div>
-  `;
-  document.getElementById('trade-out-search').addEventListener('input', debounce((e) => {
-    tradeOutSearchTerm = e.target.value;
-    fetchInventory('trade-out', 1, tradeOutSearchTerm);
-  }, 600));
-  document.getElementById('fetch-trade-in-card').addEventListener('click', () => fetchTcgCard('trade-in'));
-  document.getElementById('close-tcg-modal-trade-in').addEventListener('click', () => closeTcgModal('trade-in'));
-  document.getElementById('clear-trade-in-cart').addEventListener('click', clearTradeInCart);
-  document.getElementById('clear-trade-out-cart').addEventListener('click', clearTradeOutCart);
-}
-
 function closeTcgModal(context) {
   document.getElementById(`tcg-modal-${context}`).style.display = 'none';
 }
 
+function completeSellTransaction() {
+  console.log('Completing sell transaction:', { sellCart });
+  const items = sellCart.slice();
+  const cashIn = sellCart.reduce((sum, item) => sum + parseFloat(item.negotiatedPrice || item.price), 0);
+  const cashOut = 0;
+  ipcRenderer.send('complete-transaction', { items, type: 'sell', cashIn, cashOut });
+  ipcRenderer.once('transaction-complete', (event, data) => {
+    console.log('Sell transaction completed');
+    sellCart.length = 0;
+    showScreen('sell');
+  });
+  ipcRenderer.once('transaction-error', (event, error) => console.error('Sell transaction failed:', error));
+}
+
 function completeBuyTransaction() {
   console.log('Completing buy transaction:', { buyItems });
-  const items = buyItems;
+  const items = buyItems.slice();
   const cashIn = 0;
-  const cashOut = buyItems.reduce((sum, item) => sum + item.tradeValue, 0);
+  const cashOut = buyItems.reduce((sum, item) => sum + parseFloat(item.tradeValue), 0);
   ipcRenderer.send('complete-transaction', { items, type: 'buy', cashIn, cashOut });
-  ipcRenderer.once('transaction-complete', () => {
+  ipcRenderer.once('transaction-complete', (event, data) => {
     console.log('Buy transaction completed');
-    buyItems = [];
+    buyItems.length = 0;
     showScreen('buy');
   });
   ipcRenderer.once('transaction-error', (event, error) => console.error('Buy transaction failed:', error));
 }
 
-function addToTradeOutCart(id, name, price, imageUrl, card_set, condition) {
-  console.log('Adding to trade-out cart:', { id, name, price, imageUrl, card_set, condition });
-  tradeOutCart.push({ id, name, price, negotiatedPrice: price, image_url: imageUrl, card_set, condition, role: 'trade_out' });
-  showScreen('trade');
-}
-
-function updateTradeOutPrice(id, newPrice) {
-  console.log('Updating trade-out price:', { id, newPrice });
-  tradeOutCart = tradeOutCart.map(item => item.id === id ? { ...item, negotiatedPrice: parseFloat(newPrice) || item.price } : item);
-  showScreen('trade');
-}
-
-function addToTradeInCart() {
-  const name = document.getElementById('trade-in-name').value;
-  const type = document.getElementById('trade-in-type').value;
-  const price = parseFloat(document.getElementById('trade-in-price').value) || 0;
-  const tradeValue = parseFloat(document.getElementById('trade-in-value').value) || 0;
-  const conditionCategory = document.getElementById('trade-in-condition-category').value || '';
-  const conditionValue = document.getElementById('trade-in-condition-value').value || '';
-  const condition = conditionCategory && conditionValue ? `${conditionCategory} - ${conditionValue}` : null;
-  const image = document.getElementById('trade-in-image').files[0];
-  const id = Date.now().toString();
-  const tcg_id = document.getElementById('trade-in-tcg-id').value || null;
-  const card_set = document.getElementById('trade-in-card-set').value || null;
-  const rarity = document.getElementById('trade-in-rarity').value || null;
-  const image_url = document.getElementById('trade-in-image-url').value || null;
-
-  console.log('Adding to trade-in cart:', { id, name, type, price, tradeValue, condition, image: image ? image.name : null, tcg_id, card_set, rarity, image_url });
-  ipcRenderer.send('add-item', {
-    id,
-    name,
-    type,
-    price,
-    tradeValue,
-    condition,
-    imagePath: image ? image.path : null,
-    imageName: image ? image.name : null,
-    image_url,
-    role: 'trade_in',
-    tcg_id,
-    card_set,
-    rarity
-  });
-  ipcRenderer.once('add-item-success', (event, item) => {
-    tradeInCart.push(item);
-    showScreen('trade');
-  });
-  ipcRenderer.once('add-item-error', (event, error) => console.error('Add trade-in failed:', error));
-}
-
 function completeTradeTransaction() {
   console.log('Completing trade transaction:', { tradeInCart, tradeOutCart });
   const items = [...tradeInCart, ...tradeOutCart];
-  const cashIn = tradeOutCart.reduce((sum, item) => sum + (item.negotiatedPrice || item.price), 0);
-  const cashOut = tradeInCart.reduce((sum, item) => sum + item.tradeValue, 0);
+  const cashIn = tradeOutCart.reduce((sum, item) => sum + parseFloat(item.negotiatedPrice || item.price), 0);
+  const cashOut = tradeInCart.reduce((sum, item) => sum + parseFloat(item.tradeValue), 0);
   ipcRenderer.send('complete-transaction', { items, type: 'trade', cashIn, cashOut });
-  ipcRenderer.once('transaction-complete', () => {
+  ipcRenderer.once('transaction-complete', (event, data) => {
     console.log('Trade transaction completed');
-    tradeInCart = [];
-    tradeOutCart = [];
+    tradeInCart.length = 0;
+    tradeOutCart.length = 0;
     showScreen('trade');
   });
   ipcRenderer.once('transaction-error', (event, error) => console.error('Trade transaction failed:', error));
 }
 
-// Initial load
+function addToBuy() {
+  const conditionCategory = document.getElementById('buy-condition-category').value;
+  const conditionValue = document.getElementById('buy-condition-value').value;
+  const condition = conditionCategory ? `${conditionCategory}${conditionValue ? ' ' + conditionValue : ''}` : conditionValue;
+  const buyItem = {
+    id: Date.now().toString(),
+    name: document.getElementById('buy-name').value,
+    type: document.getElementById('buy-type').value,
+    price: parseFloat(document.getElementById('buy-price').value) || 0,
+    tradeValue: parseFloat(document.getElementById('buy-trade-value').value) || 0,
+    condition: condition || null,
+    image_url: document.getElementById('buy-image-url').value || null,
+    tcg_id: document.getElementById('buy-tcg-id').value || null,
+    card_set: document.getElementById('buy-card-set').value || null,
+    rarity: document.getElementById('buy-rarity').value || null,
+    role: 'trade_in'
+  };
+  buyItems.push(buyItem);
+  console.log('Adding to buy:', buyItem);
+  ipcRenderer.send('add-item', buyItem);
+  ipcRenderer.once('add-item-success', () => showScreen('buy'));
+  ipcRenderer.once('add-item-error', (event, error) => console.error('Add item failed:', error));
+}
+
+function clearSellCart() {
+  sellCart.length = 0;
+  fetchInventory('sell', sellPage, sellSearchTerm);
+}
+
+function clearBuyCart() {
+  buyItems.length = 0;
+  showScreen('buy');
+}
+
+function clearTradeInCart() {
+  tradeInCart.length = 0;
+  fetchInventory('trade-out', tradeOutPage, tradeOutSearchTerm);
+}
+
+function clearTradeOutCart() {
+  tradeOutCart.length = 0;
+  fetchInventory('trade-out', tradeOutPage, tradeOutSearchTerm);
+}
+
+// Initial render
 showScreen('sell');

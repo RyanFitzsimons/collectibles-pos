@@ -132,7 +132,7 @@ ipcMain.on('complete-transaction', (event, { items, type, cashIn, cashOut }) => 
         } else if (item.role === 'sold' || item.role === 'trade_out') {
           db.get('SELECT image_url, condition, card_set FROM collectibles WHERE id = ?', [item.id], (err, row) => {
             if (err) return reject(err);
-            const imageUrl = row ? row.image_url : item.image_url; // Reuse collectibles image_url
+            const imageUrl = row ? row.image_url : item.image_url;
             const condition = row ? row.condition : item.condition;
             const cardSet = row ? row.card_set : item.card_set;
             db.run('INSERT INTO transaction_items (transaction_id, item_id, name, role, negotiated_price, original_price, image_url, condition, card_set) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -181,6 +181,49 @@ ipcMain.on('get-inventory', (event, { page = 1, limit = 50, search = '' } = {}) 
       }
     });
   });
+});
+
+ipcMain.on('get-all-inventory', (event, { page = 1, limit = 50, search = '' } = {}) => {
+  const offset = (page - 1) * limit;
+  const query = `
+    SELECT * FROM collectibles 
+    WHERE name LIKE ? OR card_set LIKE ? 
+    ORDER BY name 
+    LIMIT ? OFFSET ?
+  `;
+  const params = [`%${search}%`, `%${search}%`, limit, offset];
+  
+  db.all(query, params, (err, rows) => {
+    if (err) {
+      console.error('Get all inventory error:', err);
+      event.reply('all-inventory-data', { items: [], total: 0 });
+      return;
+    }
+    db.get('SELECT COUNT(*) as total FROM collectibles WHERE name LIKE ? OR card_set LIKE ?', [`%${search}%`, `%${search}%`], (err, countResult) => {
+      if (err) {
+        console.error('Get all inventory count error:', err);
+        event.reply('all-inventory-data', { items: rows, total: 0 });
+      } else {
+        console.log('All inventory fetched:', rows.length);
+        event.reply('all-inventory-data', { items: rows, total: countResult.total });
+      }
+    });
+  });
+});
+
+ipcMain.on('update-inventory-item', (event, item) => {
+  db.run('UPDATE collectibles SET name = ?, price = ?, condition = ?, card_set = ?, rarity = ? WHERE id = ?',
+    [item.name, item.price, item.condition, item.card_set, item.rarity, item.id],
+    (err) => {
+      if (err) {
+        console.error('Update inventory item error:', err);
+        event.reply('update-inventory-error', err.message);
+      } else {
+        console.log('Inventory item updated:', item.id);
+        event.reply('update-inventory-success', item);
+      }
+    }
+  );
 });
 
 ipcMain.on('get-transactions', (event) => {
