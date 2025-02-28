@@ -16,10 +16,15 @@ const db = new sqlite3.Database(dbPath, (err) => {
 
 // Initialize database tables on app start
 db.serialize(() => {
-  // Create table for inventory items (cards in stock)
-  db.run('CREATE TABLE IF NOT EXISTS collectibles (id TEXT PRIMARY KEY, type TEXT, name TEXT, price REAL, stock INTEGER, image_url TEXT, tcg_id TEXT, card_set TEXT, rarity TEXT, condition TEXT)', (err) => {
-    if (err) console.error('Error creating collectibles table:', err);
-    else console.log('Collectibles table created or already exists');
+  // Create generic items table (replacing collectibles)
+  db.run('CREATE TABLE IF NOT EXISTS items (id TEXT PRIMARY KEY, type TEXT, name TEXT, price REAL, stock INTEGER, image_url TEXT, condition TEXT)', (err) => {
+    if (err) console.error('Error creating items table:', err);
+    else console.log('Items table created or already exists');
+  });
+  // Create table for type-specific attributes
+  db.run('CREATE TABLE IF NOT EXISTS item_attributes (item_id TEXT, key TEXT, value TEXT, PRIMARY KEY (item_id, key))', (err) => {
+    if (err) console.error('Error creating item_attributes table:', err);
+    else console.log('Item_attributes table created');
   });
   // Create table for transaction records (buy/sell/trade)
   db.run('CREATE TABLE IF NOT EXISTS transactions (id TEXT PRIMARY KEY, type TEXT, cash_in REAL, cash_out REAL, timestamp TEXT)', (err) => {
@@ -64,13 +69,13 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 
-// Handle adding a new item to inventory (e.g., during Buy/Trade-In
+// Handle adding a new item to inventory (e.g., during Buy/Trade-In)
 ipcMain.on('add-item', async (event, item) => {
   let imageUrl = null;
 
   // Download image if provided and not already a file URL
   if (item.image_url && !item.image_url.startsWith('file://')) {
-    imageUrl = path.join(__dirname, 'images', `${item.id}-${item.tcg_id || 'card'}.png`);
+    imageUrl = path.join(__dirname, 'images', `${item.id}-${item.tcg_id || 'item'}.png`);
     try {
       await new Promise((resolve, reject) => {
         const request = net.request(item.image_url);
@@ -105,15 +110,27 @@ ipcMain.on('add-item', async (event, item) => {
     image_url: imageUrl ? `file://${imageUrl}` : item.image_url
   };
   
-  // Add item to collectibles table if it’s a trade-in (bought item)
+  // Add item to items table if it’s a trade-in (bought item)
   if (item.role === 'trade_in') {
-    db.run('INSERT INTO collectibles (id, type, name, price, stock, image_url, tcg_id, card_set, rarity, condition) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-      [item.id, item.type, item.name, item.price, 1, finalItem.image_url, item.tcg_id || null, item.card_set || null, item.rarity || null, item.condition || null],
+    db.run('INSERT INTO items (id, type, name, price, stock, image_url, condition) VALUES (?, ?, ?, ?, ?, ?, ?)',
+      [item.id, item.type || 'pokemon_tcg', item.name, item.price, 1, finalItem.image_url, item.condition || null],
       (err) => {
         if (err) {
           console.error('Add item error:', err);
           event.reply('add-item-error', err.message);
         } else {
+          // Add type-specific attributes if provided
+          const attributes = [
+            { key: 'tcg_id', value: item.tcg_id },
+            { key: 'card_set', value: item.card_set },
+            { key: 'rarity', value: item.rarity }
+          ].filter(attr => attr.value);
+          attributes.forEach(attr => {
+            db.run('INSERT OR IGNORE INTO item_attributes (item_id, key, value) VALUES (?, ?, ?)',
+              [item.id, attr.key, attr.value], (err) => {
+                if (err) console.error('Error adding attribute:', err);
+              });
+          });
           console.log('Item added to DB:', finalItem);
           event.reply('add-item-success', finalItem);
         }
@@ -138,7 +155,7 @@ ipcMain.on('complete-transaction', (event, { items, type, cashIn, cashOut }) => 
       const itemInserts = items.map(item => new Promise((resolve, reject) => {
         if (item.role === 'trade_in') {
           const imageUrl = item.image_url && !item.image_url.startsWith('file://') 
-            ? `file://${path.join(__dirname, 'images', `${item.id}-${item.tcg_id || 'card'}.png`)}` 
+            ? `file://${path.join(__dirname, 'images', `${item.id}-${item.tcg_id || 'item'}.png`)}` 
             : item.image_url;
           db.run('INSERT INTO transaction_items (transaction_id, item_id, name, role, trade_value, original_price, image_url, condition, card_set) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [txId, item.id, item.name, item.role, item.tradeValue, item.price, imageUrl, item.condition, item.card_set], (err) => {
@@ -146,13 +163,12 @@ ipcMain.on('complete-transaction', (event, { items, type, cashIn, cashOut }) => 
               else resolve();
             });
         } else if (item.role === 'sold' || item.role === 'trade_out') {
-          db.get('SELECT image_url, condition, card_set FROM collectibles WHERE id = ?', [item.id], (err, row) => {
+          db.get('SELECT image_url, condition FROM items WHERE id = ?', [item.id], (err, row) => {
             if (err) return reject(err);
             const imageUrl = row ? row.image_url : item.image_url;
             const condition = row ? row.condition : item.condition;
-            const cardSet = row ? row.card_set : item.card_set;
-            db.run('INSERT INTO transaction_items (transaction_id, item_id, name, role, negotiated_price, original_price, image_url, condition, card_set) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-              [txId, item.id, item.name, item.role, item.negotiatedPrice, item.price, imageUrl, condition, cardSet], (err) => {
+            db.run('INSERT INTO transaction_items (transaction_id, item_id, name, role, negotiated_price, original_price, image_url, condition) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+              [txId, item.id, item.name, item.role, item.negotiatedPrice, item.price, imageUrl, condition], (err) => {
                 if (err) reject(err);
                 else resolve();
               });
@@ -162,7 +178,7 @@ ipcMain.on('complete-transaction', (event, { items, type, cashIn, cashOut }) => 
       // Update stock and confirm transaction
       Promise.all(itemInserts)
         .then(() => {
-          db.run('UPDATE collectibles SET stock = stock - 1 WHERE id IN (SELECT item_id FROM transaction_items WHERE transaction_id = ? AND role IN ("sold", "trade_out"))', [txId], (err) => {
+          db.run('UPDATE items SET stock = stock - 1 WHERE id IN (SELECT item_id FROM transaction_items WHERE transaction_id = ? AND role IN ("sold", "trade_out"))', [txId], (err) => {
             if (err) console.error('Error updating stock:', err);
             event.reply('transaction-complete', { txId, type });
           });
@@ -176,10 +192,13 @@ ipcMain.on('complete-transaction', (event, { items, type, cashIn, cashOut }) => 
 ipcMain.on('get-inventory', (event, { page = 1, limit = 50, search = '' } = {}) => {
   const offset = (page - 1) * limit;
   const query = `
-    SELECT * FROM collectibles 
-    WHERE stock > 0 
-    AND (name LIKE ? OR card_set LIKE ?) 
-    ORDER BY name 
+    SELECT i.*, GROUP_CONCAT(a.key || ':' || a.value) as attributes 
+    FROM items i 
+    LEFT JOIN item_attributes a ON i.id = a.item_id
+    WHERE i.stock > 0 
+    AND (i.name LIKE ? OR EXISTS (SELECT 1 FROM item_attributes WHERE item_id = i.id AND value LIKE ?))
+    GROUP BY i.id
+    ORDER BY i.name 
     LIMIT ? OFFSET ?
   `;
   const params = [`%${search}%`, `%${search}%`, limit, offset];
@@ -190,12 +209,16 @@ ipcMain.on('get-inventory', (event, { page = 1, limit = 50, search = '' } = {}) 
       event.reply('inventory-data', { items: [], total: 0 });
       return;
     }
-    db.get('SELECT COUNT(*) as total FROM collectibles WHERE stock > 0 AND (name LIKE ? OR card_set LIKE ?)', [`%${search}%`, `%${search}%`], (err, countResult) => {
+    const formattedRows = rows.map(row => ({
+      ...row,
+      attributes: row.attributes ? Object.fromEntries(row.attributes.split(',').map(attr => attr.split(':'))) : {}
+    }));
+    db.get('SELECT COUNT(*) as total FROM items WHERE stock > 0 AND (name LIKE ? OR EXISTS (SELECT 1 FROM item_attributes WHERE item_id = items.id AND value LIKE ?))', [`%${search}%`, `%${search}%`], (err, countResult) => {
       if (err) {
         console.error('Get inventory count error:', err);
-        event.reply('inventory-data', { items: rows, total: 0 });
+        event.reply('inventory-data', { items: formattedRows, total: 0 });
       } else {
-        event.reply('inventory-data', { items: rows, total: countResult.total });
+        event.reply('inventory-data', { items: formattedRows, total: countResult.total });
       }
     });
   });
@@ -205,9 +228,12 @@ ipcMain.on('get-inventory', (event, { page = 1, limit = 50, search = '' } = {}) 
 ipcMain.on('get-all-inventory', (event, { page = 1, limit = 50, search = '' } = {}) => {
   const offset = (page - 1) * limit;
   const query = `
-    SELECT * FROM collectibles 
-    WHERE name LIKE ? OR card_set LIKE ? 
-    ORDER BY name 
+    SELECT i.*, GROUP_CONCAT(a.key || ':' || a.value) as attributes 
+    FROM items i 
+    LEFT JOIN item_attributes a ON i.id = a.item_id
+    WHERE i.name LIKE ? OR EXISTS (SELECT 1 FROM item_attributes WHERE item_id = i.id AND value LIKE ?)
+    GROUP BY i.id
+    ORDER BY i.name 
     LIMIT ? OFFSET ?
   `;
   const params = [`%${search}%`, `%${search}%`, limit, offset];
@@ -218,13 +244,17 @@ ipcMain.on('get-all-inventory', (event, { page = 1, limit = 50, search = '' } = 
       event.reply('all-inventory-data', { items: [], total: 0 });
       return;
     }
-    db.get('SELECT COUNT(*) as total FROM collectibles WHERE name LIKE ? OR card_set LIKE ?', [`%${search}%`, `%${search}%`], (err, countResult) => {
+    const formattedRows = rows.map(row => ({
+      ...row,
+      attributes: row.attributes ? Object.fromEntries(row.attributes.split(',').map(attr => attr.split(':'))) : {}
+    }));
+    db.get('SELECT COUNT(*) as total FROM items WHERE name LIKE ? OR EXISTS (SELECT 1 FROM item_attributes WHERE item_id = items.id AND value LIKE ?)', [`%${search}%`, `%${search}%`], (err, countResult) => {
       if (err) {
         console.error('Get all inventory count error:', err);
-        event.reply('all-inventory-data', { items: rows, total: 0 });
+        event.reply('all-inventory-data', { items: formattedRows, total: 0 });
       } else {
-        console.log('All inventory fetched:', rows.length);
-        event.reply('all-inventory-data', { items: rows, total: countResult.total });
+        console.log('All inventory fetched:', formattedRows.length);
+        event.reply('all-inventory-data', { items: formattedRows, total: countResult.total });
       }
     });
   });
@@ -232,8 +262,8 @@ ipcMain.on('get-all-inventory', (event, { page = 1, limit = 50, search = '' } = 
 
 // Update an existing inventory item’s details
 ipcMain.on('update-inventory-item', (event, item) => {
-  db.run('UPDATE collectibles SET name = ?, price = ?, condition = ?, card_set = ?, rarity = ? WHERE id = ?',
-    [item.name, item.price, item.condition, item.card_set, item.rarity, item.id],
+  db.run('UPDATE items SET name = ?, price = ?, condition = ? WHERE id = ?',
+    [item.name, item.price, item.condition, item.id],
     (err) => {
       if (err) {
         console.error('Update inventory item error:', err);
@@ -351,7 +381,7 @@ ipcMain.on('get-tcg-card', (event, cardName) => {
       const cards = response.data.data.map(card => ({
         tcg_id: card.id,
         name: card.name,
-        type: card.supertype.toLowerCase() === 'pokémon' ? 'pokemon_card' : card.supertype,
+        type: 'pokemon_tcg', // Default to Pokémon TCG for now
         price: card.cardmarket?.prices?.averageSellPrice || 0,
         tradeValue: card.cardmarket?.prices?.averageSellPrice * 0.5 || 0,
         image_url: card.images.small,
@@ -363,23 +393,19 @@ ipcMain.on('get-tcg-card', (event, cardName) => {
     })
     .catch(err => {
       console.error('TCG API error, falling back to DB:', err.message);
-      db.all('SELECT * FROM collectibles WHERE name LIKE ?', [`%${cardName}%`], (dbErr, rows) => {
+      db.all('SELECT i.*, GROUP_CONCAT(a.key || ":" || a.value) as attributes FROM items i LEFT JOIN item_attributes a ON i.id = a.item_id WHERE i.name LIKE ? GROUP BY i.id', [`%${cardName}%`], (dbErr, rows) => {
         if (dbErr) {
           console.error('Database error:', dbErr);
           event.reply('tcg-card-error', dbErr);
           return;
         }
-        console.log('Found in DB:', rows.length, 'matches');
-        event.reply('tcg-card-data', rows.map(row => ({
-          tcg_id: row.tcg_id,
-          name: row.name,
-          type: row.type,
-          price: row.price,
-          tradeValue: row.trade_value,
-          image_url: row.image_url,
-          card_set: row.card_set,
-          rarity: row.rarity
-        })));
+        const formattedRows = rows.map(row => ({
+          ...row,
+          attributes: row.attributes ? Object.fromEntries(row.attributes.split(',').map(attr => attr.split(':'))) : {},
+          type: row.type || 'pokemon_tcg' // Default for backward compatibility
+        }));
+        console.log('Found in DB:', formattedRows.length, 'matches');
+        event.reply('tcg-card-data', formattedRows);
       });
     });
 });
