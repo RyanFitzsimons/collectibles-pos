@@ -323,6 +323,19 @@ ipcMain.on('save-reconciliation', (event, reconciliation) => {
   );
 });
 
+// Fetch all cash reconciliation records for Reports tab display
+ipcMain.on('get-reconciliations', (event) => {
+  db.all('SELECT * FROM cash_reconciliations ORDER BY date DESC', (err, rows) => {
+    if (err) {
+      console.error('Error fetching reconciliations:', err);
+      event.reply('reconciliations-error', err.message);
+    } else {
+      console.log('Reconciliations fetched:', rows.length);
+      event.reply('reconciliations-data', rows);
+    }
+  });
+});
+
 // Fetch TCG card data from API or DB for Buy/Trade-In
 ipcMain.on('get-tcg-card', (event, cardName) => {
   console.log('Fetching TCG card:', cardName);

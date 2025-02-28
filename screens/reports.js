@@ -1,7 +1,7 @@
 const { ipcRenderer } = require('electron');
 const { cleanPrice } = require('../utils');
 
-// Render the Reports tab UI with cash reconciliation
+// Render the Reports tab UI with cash reconciliation and past records
 function render() {
   const content = document.getElementById('content');
   content.innerHTML = `
@@ -48,8 +48,42 @@ function render() {
           <button id="close-reconciliation">Close</button>
         </div>
       </div>
+      <h4>Previous Reconciliations</h4>
+      <table class="reconciliations-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Starting Cash</th>
+            <th>Total Cash In</th>
+            <th>Total Cash Out</th>
+            <th>Expected Cash</th>
+            <th>Actual Cash</th>
+            <th>Discrepancy</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody id="reconciliations-list"></tbody>
+      </table>
     </div>
   `;
+
+  // Fetch and display reconciliations
+  ipcRenderer.send('get-reconciliations');
+  ipcRenderer.once('reconciliations-data', (event, rows) => {
+    const tbody = document.getElementById('reconciliations-list');
+    tbody.innerHTML = rows.map(row => `
+      <tr>
+        <td>${new Date(row.date).toLocaleString()}</td>
+        <td>${cleanPrice(row.starting_cash.toFixed(2))}</td>
+        <td>${cleanPrice(row.total_cash_in.toFixed(2))}</td>
+        <td>${cleanPrice(row.total_cash_out.toFixed(2))}</td>
+        <td>${cleanPrice(row.expected_cash.toFixed(2))}</td>
+        <td>${cleanPrice(row.actual_cash.toFixed(2))}</td>
+        <td>${cleanPrice(row.discrepancy.toFixed(2))}</td>
+        <td>${row.notes || ''}</td>
+      </tr>
+    `).join('');
+  });
 
   document.getElementById('reconcile-cash').addEventListener('click', () => {
     const modal = document.getElementById('reconciliation-modal');
@@ -97,6 +131,7 @@ function render() {
     ipcRenderer.send('save-reconciliation', reconciliation);
     ipcRenderer.once('reconciliation-success', () => {
       document.getElementById('reconciliation-modal').style.display = 'none';
+      render(); // Refresh to show new reconciliation
     });
   });
 
