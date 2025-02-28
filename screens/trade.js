@@ -1,6 +1,6 @@
 const { ipcRenderer } = require('electron');
 const { cleanPrice, debounce } = require('../utils');
-const { tradeInCart, tradeOutCart } = require('../cart'); // Updated import
+const { tradeInCart, tradeOutCart } = require('../cart');
 
 // Fetch inventory data from main process for Trade-Out
 function fetchInventory(page, searchTerm) {
@@ -244,7 +244,7 @@ function closeTcgModal(context) {
   document.getElementById(`tcg-modal-${context}`).style.display = 'none';
 }
 
-// Add a manual item to the Trade-In cart and inventory
+// Add a manual item to the Trade-In cart (no inventory add yet)
 function addToTradeInCart() {
   const conditionCategory = document.getElementById('trade-in-condition-category').value;
   const conditionValue = document.getElementById('trade-in-condition-value').value;
@@ -263,9 +263,8 @@ function addToTradeInCart() {
     role: 'trade_in'
   };
   tradeInCart.push(tradeInItem);
-  ipcRenderer.send('add-item', tradeInItem);
-  ipcRenderer.once('add-item-success', () => render(tradeOutPage, tradeOutSearchTerm, tradeInCart, tradeOutCart));
-  ipcRenderer.once('add-item-error', (event, error) => console.error('Add item failed:', error));
+  console.log('Adding to trade-in cart:', tradeInItem);
+  render(tradeOutPage, tradeOutSearchTerm, tradeInCart, tradeOutCart); // Refresh Trade tab with updated cart (no IPC call here)
 }
 
 // Add an item from inventory to the Trade-Out cart
@@ -285,12 +284,16 @@ function updateTradeOutPrice(id, value) {
   fetchInventory(tradeOutPage, tradeOutSearchTerm); // Refresh Trade tab with updated total
 }
 
-// Complete a Trade transaction and clear both carts
+// Complete a Trade transaction, add Trade-In items to inventory, and clear both carts
 function completeTradeTransaction() {
   console.log('Completing trade transaction:', { tradeInCart, tradeOutCart });
   const items = [...tradeInCart, ...tradeOutCart];
   const cashIn = tradeOutCart.reduce((sum, item) => sum + parseFloat(item.negotiatedPrice || item.price), 0);
   const cashOut = tradeInCart.reduce((sum, item) => sum + parseFloat(item.tradeValue), 0);
+  
+  // Add Trade-In items to inventory only on completion
+  tradeInCart.forEach(item => ipcRenderer.send('add-item', item));
+  
   ipcRenderer.send('complete-transaction', { items, type: 'trade', cashIn, cashOut });
   ipcRenderer.once('transaction-complete', (event, data) => {
     console.log('Trade transaction completed');

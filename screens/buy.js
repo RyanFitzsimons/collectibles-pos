@@ -1,6 +1,6 @@
 const { ipcRenderer } = require('electron');
 const { cleanPrice } = require('../utils');
-const { buyItems } = require('../cart'); // Updated import
+const { buyItems } = require('../cart');
 
 // Render the Buy tab UI with cart
 function render(cart) {
@@ -169,7 +169,7 @@ function closeTcgModal(context) {
   document.getElementById(`tcg-modal-${context}`).style.display = 'none';
 }
 
-// Add a manual item to the Buy cart and inventory
+// Add a manual item to the Buy cart (no inventory add yet)
 function addToBuy() {
   const conditionCategory = document.getElementById('buy-condition-category').value;
   const conditionValue = document.getElementById('buy-condition-value').value;
@@ -188,18 +188,20 @@ function addToBuy() {
     role: 'trade_in'
   };
   buyItems.push(buyItem);
-  console.log('Adding to buy:', buyItem);
-  ipcRenderer.send('add-item', buyItem);
-  ipcRenderer.once('add-item-success', () => require('../renderer').showScreen('buy'));
-  ipcRenderer.once('add-item-error', (event, error) => console.error('Add item failed:', error));
+  console.log('Adding to buy cart:', buyItem);
+  render(buyItems); // Refresh Buy tab with updated cart (no IPC call here)
 }
 
-// Complete a Buy transaction and clear the cart
+// Complete a Buy transaction, add items to inventory, and clear the cart
 function completeBuyTransaction() {
   console.log('Completing buy transaction:', { buyItems });
   const items = buyItems.slice();
   const cashIn = 0;
   const cashOut = buyItems.reduce((sum, item) => sum + parseFloat(item.tradeValue), 0);
+  
+  // Add items to inventory only on completion
+  items.forEach(item => ipcRenderer.send('add-item', item));
+  
   ipcRenderer.send('complete-transaction', { items, type: 'buy', cashIn, cashOut });
   ipcRenderer.once('transaction-complete', (event, data) => {
     console.log('Buy transaction completed');
