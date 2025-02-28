@@ -1,22 +1,29 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <meta charset="UTF-8">
   <title>Collectibles POS</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div class="sidebar">
-    <h2>POS</h2>
-    <button onclick="showScreen('sell')">Sell</button>
-    <button onclick="showScreen('buy')">Buy</button>
-    <button onclick="showScreen('trade')">Trade</button>
-    <button onclick="showScreen('transactions')">Transactions</button>
-    <button onclick="showScreen('inventory')">Inventory</button>
-    <button onclick="showScreen('reports')">Reports</button>
+  <div id="sidebar">
+    <button id="sell-btn">Sell</button>
+    <button id="buy-btn">Buy</button>
+    <button id="trade-btn">Trade</button>
+    <button id="transactions-btn">Transactions</button>
+    <button id="inventory-btn">Inventory</button>
+    <button id="reports-btn">Reports</button>
   </div>
-  <div class="main-content">
-    <div id="content"></div>
-  </div>
+  <div id="content"></div>
   <script src="renderer.js"></script>
+  <script>
+    // Add event listeners after renderer.js loads
+    document.getElementById('sell-btn').addEventListener('click', () => require('./renderer').showScreen('sell'));
+    document.getElementById('buy-btn').addEventListener('click', () => require('./renderer').showScreen('buy'));
+    document.getElementById('trade-btn').addEventListener('click', () => require('./renderer').showScreen('trade'));
+    document.getElementById('transactions-btn').addEventListener('click', () => require('./renderer').showScreen('transactions'));
+    document.getElementById('inventory-btn').addEventListener('click', () => require('./renderer').showScreen('inventory'));
+    document.getElementById('reports-btn').addEventListener('click', () => require('./renderer').showScreen('reports'));
+  </script>
 </body>
 </html>
