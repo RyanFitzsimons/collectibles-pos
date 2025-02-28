@@ -1,5 +1,5 @@
 const { ipcRenderer } = require('electron');
-const { cleanPrice } = require('../utils');
+const { cleanPrice, debounce } = require('../utils'); // Add debounce import
 
 // Render the Inventory tab UI with editable items
 function render() {
@@ -24,34 +24,34 @@ function render() {
           <h3>Inventory</h3>
           <div class="input-group">
             <label>Filter Inventory</label>
-            <input id="inventory-search" type="text" placeholder="Search by Name or Set" value="${searchTerm}">
+            <input id="inventory-search" type="text" placeholder="Search by Name or Attributes" value="${searchTerm}">
           </div>
           <table class="inventory-table">
             <thead>
               <tr>
                 <th data-sort="id">ID</th>
+                <th data-sort="type">Type</th>
                 <th data-sort="name">Name</th>
                 <th data-sort="price">Price</th>
                 <th>Trade Value</th>
                 <th data-sort="stock">Stock</th>
                 <th data-sort="condition">Condition</th>
-                <th data-sort="card_set">Set</th>
-                <th data-sort="rarity">Rarity</th>
+                <th>Attributes</th>
                 <th>Image</th>
                 <th>Actions</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody id="inventory-items">
               ${paginatedItems.map(item => `
-                <tr>
+                <tr id="row-${item.id}">
                   <td>${item.id}</td>
+                  <td><input id="type-${item.id}" value="${item.type}" disabled></td>
                   <td><input id="name-${item.id}" value="${item.name}" disabled></td>
                   <td><input id="price-${item.id}" type="number" value="${item.price}" disabled></td>
                   <td>${cleanPrice(item.trade_value || Math.floor(item.price * 0.5))}</td>
                   <td>${item.stock}</td>
                   <td><input id="condition-${item.id}" value="${item.condition || ''}" disabled></td>
-                  <td><input id="card_set-${item.id}" value="${item.card_set || ''}" disabled></td>
-                  <td><input id="rarity-${item.id}" value="${item.rarity || ''}" disabled></td>
+                  <td>${formatAttributes(item.attributes)}</td>
                   <td>${item.image_url ? `<img src="${item.image_url}" alt="${item.name}" style="max-width: 50px;">` : 'No Image'}</td>
                   <td>
                     <button class="edit-item" data-id="${item.id}">Edit</button>
@@ -106,13 +106,17 @@ function render() {
         }
       });
 
+      // Bind edit/save events after DOM render
       document.querySelectorAll('.edit-item').forEach(button => {
         button.addEventListener('click', () => {
           const id = button.dataset.id;
+          console.log('Edit clicked for ID:', id); // Debug log
           button.style.display = 'none';
-          document.querySelector(`.save-item[data-id="${id}"]`).style.display = 'inline';
-          ['name', 'price', 'condition', 'card_set', 'rarity'].forEach(field => {
-            document.getElementById(`${field}-${id}`).disabled = false;
+          const saveButton = document.querySelector(`.save-item[data-id="${id}"]`);
+          if (saveButton) saveButton.style.display = 'inline';
+          ['type', 'name', 'price', 'condition'].forEach(field => {
+            const input = document.getElementById(`${field}-${id}`);
+            if (input) input.disabled = false;
           });
         });
       });
@@ -120,20 +124,22 @@ function render() {
       document.querySelectorAll('.save-item').forEach(button => {
         button.addEventListener('click', () => {
           const id = button.dataset.id;
+          console.log('Save clicked for ID:', id); // Debug log
           const updatedItem = {
             id,
+            type: document.getElementById(`type-${id}`).value,
             name: document.getElementById(`name-${id}`).value,
             price: parseFloat(document.getElementById(`price-${id}`).value) || 0,
-            condition: document.getElementById(`condition-${id}`).value,
-            card_set: document.getElementById(`card_set-${id}`).value,
-            rarity: document.getElementById(`rarity-${id}`).value
+            condition: document.getElementById(`condition-${id}`).value
           };
           ipcRenderer.send('update-inventory-item', updatedItem);
           ipcRenderer.once('update-inventory-success', () => {
             button.style.display = 'none';
-            document.querySelector(`.edit-item[data-id="${id}"]`).style.display = 'inline';
-            ['name', 'price', 'condition', 'card_set', 'rarity'].forEach(field => {
-              document.getElementById(`${field}-${id}`).disabled = true;
+            const editButton = document.querySelector(`.edit-item[data-id="${id}"]`);
+            if (editButton) editButton.style.display = 'inline';
+            ['type', 'name', 'price', 'condition'].forEach(field => {
+              const input = document.getElementById(`${field}-${id}`);
+              if (input) input.disabled = true;
             });
             allItems = allItems.map(i => i.id === id ? { ...i, ...updatedItem } : i);
             renderInventory(allItems);
@@ -148,7 +154,8 @@ function render() {
       if (searchTerm) {
         filtered = filtered.filter(item => 
           item.name.toLowerCase().includes(searchTerm) || 
-          (item.card_set || '').toLowerCase().includes(searchTerm)
+          item.type.toLowerCase().includes(searchTerm) ||
+          Object.values(item.attributes || {}).some(value => value.toLowerCase().includes(searchTerm))
         );
       }
       sortedItems = filtered.sort((a, b) => {
@@ -158,6 +165,11 @@ function render() {
       });
       currentPage = 1;
       renderInventory(sortedItems);
+    }
+
+    function formatAttributes(attributes) {
+      if (!attributes || Object.keys(attributes).length === 0) return '';
+      return Object.entries(attributes).map(([key, value]) => `${key}: ${value}`).join(', ');
     }
 
     renderInventory(allItems);

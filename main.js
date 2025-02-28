@@ -119,20 +119,30 @@ ipcMain.on('add-item', async (event, item) => {
           console.error('Add item error:', err);
           event.reply('add-item-error', err.message);
         } else {
-          // Add type-specific attributes if provided
-          const attributes = [
-            { key: 'tcg_id', value: item.tcg_id },
-            { key: 'card_set', value: item.card_set },
-            { key: 'rarity', value: item.rarity }
-          ].filter(attr => attr.value);
-          attributes.forEach(attr => {
-            db.run('INSERT OR IGNORE INTO item_attributes (item_id, key, value) VALUES (?, ?, ?)',
-              [item.id, attr.key, attr.value], (err) => {
-                if (err) console.error('Error adding attribute:', err);
+          // Add all type-specific attributes from item.attributes
+          if (item.attributes && Object.keys(item.attributes).length > 0) {
+            const attributeInserts = Object.entries(item.attributes).map(([key, value]) => 
+              new Promise((resolve, reject) => {
+                db.run('INSERT OR IGNORE INTO item_attributes (item_id, key, value) VALUES (?, ?, ?)',
+                  [item.id, key, value], (err) => {
+                    if (err) reject(err);
+                    else resolve();
+                  });
+              })
+            );
+            Promise.all(attributeInserts)
+              .then(() => {
+                console.log('Item and attributes added to DB:', finalItem);
+                event.reply('add-item-success', finalItem);
+              })
+              .catch(err => {
+                console.error('Error adding attributes:', err);
+                event.reply('add-item-error', err.message);
               });
-          });
-          console.log('Item added to DB:', finalItem);
-          event.reply('add-item-success', finalItem);
+          } else {
+            console.log('Item added to DB (no attributes):', finalItem);
+            event.reply('add-item-success', finalItem);
+          }
         }
       });
   } else {

@@ -1,6 +1,6 @@
 const { ipcRenderer } = require('electron');
 const { cleanPrice, debounce } = require('../utils');
-const { sellCart } = require('../cart'); // Updated import
+const { sellCart } = require('../cart');
 
 // Fetch inventory data from main process for Sell tab
 function fetchInventory(page, searchTerm) {
@@ -26,13 +26,13 @@ function render(page, searchTerm, cart, inventory = null, total = null) {
     <h3>Sell to Customer</h3>
     <div>
       <h4>Inventory</h4>
-      <input id="sell-search" type="text" placeholder="Search inventory (e.g., Charizard, Base Set)" value="${searchTerm}">
+      <input id="sell-search" type="text" placeholder="Search inventory (e.g., Charizard, PS4)" value="${searchTerm}">
       <ul id="sell-inventory-list">
         ${inventory.map(item => `
           <li>
             ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}">` : ''}
-            ${item.name} (${item.card_set || 'Unknown Set'}) - ${cleanPrice(item.price)} (${item.condition || 'Not Set'}) 
-            <button class="add-to-sell-cart" data-id="${item.id}" data-name="${item.name}" data-price="${item.price}" data-image="${encodeURIComponent(item.image_url || '')}" data-set="${item.card_set || ''}" data-condition="${item.condition || ''}">Add</button>
+            ${item.name} (${item.type}${formatAttributes(item.attributes)}) - ${cleanPrice(item.price)} (${item.condition || 'Not Set'}) 
+            <button class="add-to-sell-cart" data-id="${item.id}" data-name="${item.name}" data-price="${item.price}" data-image="${encodeURIComponent(item.image_url || '')}" data-type="${item.type}" data-condition="${item.condition || ''}" data-attributes='${JSON.stringify(item.attributes)}'>Add</button>
           </li>
         `).join('')}
       </ul>
@@ -48,7 +48,7 @@ function render(page, searchTerm, cart, inventory = null, total = null) {
         ${cart.map(item => `
           <li>
             ${item.image_url ? `<img src="${decodeURIComponent(item.image_url)}" alt="${item.name}" style="max-width: 50px;">` : 'No Image'}
-            ${item.name} (${item.card_set || 'Unknown Set'}) - 
+            ${item.name} (${item.type}${formatAttributes(item.attributes)}) - 
             <input type="number" value="${item.negotiatedPrice || item.price}" class="sell-price-input" data-id="${item.id}" style="width: 60px;">
             (Original: ${cleanPrice(item.price)}, ${item.condition || 'Not Set'})
           </li>
@@ -71,8 +71,8 @@ function render(page, searchTerm, cart, inventory = null, total = null) {
   document.getElementById('clear-sell-cart').addEventListener('click', clearSellCart);
   document.querySelectorAll('.add-to-sell-cart').forEach(button => {
     button.addEventListener('click', () => {
-      const { id, name, price, image, set, condition } = button.dataset;
-      addToSellCart(id, name, parseFloat(price), decodeURIComponent(image), set, condition);
+      const { id, name, price, image, type, condition, attributes } = button.dataset;
+      addToSellCart(id, name, parseFloat(price), decodeURIComponent(image), type, condition, JSON.parse(attributes));
     });
   });
   document.querySelectorAll('.sell-price-input').forEach(input => {
@@ -80,10 +80,25 @@ function render(page, searchTerm, cart, inventory = null, total = null) {
   });
 }
 
+// Format attributes for display
+function formatAttributes(attributes) {
+  if (!attributes || Object.keys(attributes).length === 0) return '';
+  return ' - ' + Object.entries(attributes).map(([key, value]) => `${key}: ${value}`).join(', ');
+}
+
 // Add an item from inventory to the Sell cart
-function addToSellCart(id, name, price, image_url, card_set, condition) {
-  console.log('Adding to sell cart:', { id, name, price, image_url, card_set, condition });
-  sellCart.push({ id, name, price, image_url, card_set, condition, role: 'sold' });
+function addToSellCart(id, name, price, image_url, type, condition, attributes) {
+  console.log('Adding to sell cart:', { id, name, price, image_url, type, condition, attributes });
+  sellCart.push({
+    id,
+    name,
+    price,
+    image_url,
+    type,
+    condition,
+    attributes: attributes || {},
+    role: 'sold'
+  });
   fetchInventory(sellPage, sellSearchTerm); // Refresh Sell tab with updated cart
 }
 
