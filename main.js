@@ -465,13 +465,16 @@ ipcMain.on('get-game-data', async (event, { name, platform }) => {
         format: 'json',
         query: name,
         resources: 'game',
-        limit: 10, // Get multiple results for selection
+        limit: 100, // Get multiple results for selection
         field_list: 'id,name,platforms,original_release_date,deck,image,genres'
       }
     });
 
     const games = response.data.results.map(game => {
       const imageUrl = game.image && game.image.medium_url ? game.image.medium_url : null;
+      const matchedPlatform = platform && game.platforms && game.platforms.some(p => p.abbreviation === platform) 
+        ? platform 
+        : game.platforms?.map(p => p.abbreviation).join(', ') || 'Multiple';
       return {
         id: game.id.toString(),
         name: game.name,
@@ -479,7 +482,7 @@ ipcMain.on('get-game-data', async (event, { name, platform }) => {
         price: 0, // Giant Bomb doesn’t provide price; default to 0, user can adjust
         tradeValue: 0, // Same—user can set this
         image_url: imageUrl,
-        platform: game.platforms && game.platforms.some(p => p.abbreviation === platform) ? platform : game.platforms?.[0]?.abbreviation || null,
+        platform: matchedPlatform,
         release_date: game.original_release_date || null,
         description: game.deck || null,
         genres: game.genres ? game.genres.map(g => g.name).join(', ') : null
@@ -488,7 +491,7 @@ ipcMain.on('get-game-data', async (event, { name, platform }) => {
 
     if (games.length > 0 && games[0].image_url) {
       const cacheDir = path.join(__dirname, 'images', 'cache');
-      const cacheFileName = `video_game_${games[0].name.replace(/\s+/g, '_')}_${platform.replace(/\s+/g, '_')}.png`;
+      const cacheFileName = `video_game_${games[0].name.replace(/\s+/g, '_')}_${platform ? platform.replace(/\s+/g, '_') : 'default'}.png`;
       const cachePath = path.join(cacheDir, cacheFileName);
 
       if (!fs.existsSync(cachePath)) {

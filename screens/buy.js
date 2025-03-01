@@ -111,7 +111,7 @@ function render(cart) {
       gameDiv.innerHTML = `
         ${game.image_url ? `<img src="${game.image_url}" alt="${game.name}" style="width: auto; height: auto; max-width: 180px; max-height: 250px;">` : 'No Image'}
         <p><strong>${game.name}</strong></p>
-        <p>Platform: ${game.platform || 'Unknown'}</p>
+        <p>Platforms: ${game.platform || 'Unknown'}</p>
         <p>Release: ${game.release_date || 'N/A'}</p>
         <p>Genres: ${game.genres || 'N/A'}</p>
         <button class="select-game" data-index="${index}">Select</button>
@@ -204,12 +204,12 @@ function fetchGameData() {
   const type = document.getElementById('buy-type-selector').value;
   if (type !== 'video_game') return;
   const name = document.getElementById('buy-game-name').value || document.getElementById('buy-name').value;
-  const platform = document.getElementById('buy-platform').value;
-  if (!name || !platform) {
-    console.error('Name and platform required for video game fetch');
+  const platform = document.getElementById('buy-platform').value || ''; // Optional
+  if (!name) {
+    console.error('Name required for video game fetch');
     return;
   }
-  console.log('Fetching game data for:', name, platform);
+  console.log('Fetching game data for:', name, platform || 'all platforms');
   ipcRenderer.send('get-game-data', { name, platform });
 }
 
@@ -234,7 +234,7 @@ function selectGame(game, context) {
   if (conditionCategoryField) conditionCategoryField.value = '';
   if (conditionValueField) conditionValueField.value = '';
   if (imageUrlField) imageUrlField.value = game.image_url || '';
-  if (platformField) platformField.value = game.platform || '';
+  if (platformField) platformField.value = game.platform.split(', ')[0] || ''; // Take first platform if multiple
   
   closeGameModal(context);
 }

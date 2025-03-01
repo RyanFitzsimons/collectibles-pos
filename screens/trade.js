@@ -174,8 +174,11 @@ function render(page, searchTerm, inCart, outCart, inventory = null, total = nul
     input.addEventListener('change', (e) => updateTradeOutPrice(input.dataset.id, e.target.value));
   });
 
+  // Move game data listener inside render to ensure DOM is ready
+  ipcRenderer.removeAllListeners('game-data'); // Clear old listeners
   ipcRenderer.on('game-data', (event, games) => {
     const gameList = document.getElementById('game-list-trade-in');
+    if (!gameList) return console.error('Game list not found in DOM');
     gameList.innerHTML = '';
     games.forEach((game, index) => {
       const gameDiv = document.createElement('div');
@@ -183,14 +186,16 @@ function render(page, searchTerm, inCart, outCart, inventory = null, total = nul
       gameDiv.innerHTML = `
         ${game.image_url ? `<img src="${game.image_url}" alt="${game.name}" style="width: auto; height: auto; max-width: 180px; max-height: 250px;">` : 'No Image'}
         <p><strong>${game.name}</strong></p>
-        <p>Platform: ${game.platform || 'Unknown'}</p>
+        <p>Platforms: ${game.platform || 'Unknown'}</p>
         <p>Release: ${game.release_date || 'N/A'}</p>
         <p>Genres: ${game.genres || 'N/A'}</p>
         <button class="select-game" data-index="${index}">Select</button>
       `;
       gameList.appendChild(gameDiv);
     });
-    document.getElementById('game-modal-trade-in').style.display = 'flex';
+    const modal = document.getElementById('game-modal-trade-in');
+    if (modal) modal.style.display = 'flex';
+    else console.error('Game modal not found in DOM');
 
     document.querySelectorAll('#game-list-trade-in .select-game').forEach(button => {
       button.addEventListener('click', () => {
@@ -276,12 +281,12 @@ function fetchTradeInGameData() {
   const type = document.getElementById('trade-in-type-selector').value;
   if (type !== 'video_game') return;
   const name = document.getElementById('trade-in-game-name').value || document.getElementById('trade-in-name').value;
-  const platform = document.getElementById('trade-in-platform').value;
-  if (!name || !platform) {
-    console.error('Name and platform required for video game fetch');
+  const platform = document.getElementById('trade-in-platform').value || ''; // Optional
+  if (!name) {
+    console.error('Name required for video game fetch');
     return;
   }
-  console.log('Fetching game data for:', name, platform);
+  console.log('Fetching game data for:', name, platform || 'all platforms');
   ipcRenderer.send('get-game-data', { name, platform });
 }
 
@@ -306,7 +311,7 @@ function selectGame(game, context) {
   if (conditionCategoryField) conditionCategoryField.value = '';
   if (conditionValueField) conditionValueField.value = '';
   if (imageUrlField) imageUrlField.value = game.image_url || '';
-  if (platformField) platformField.value = game.platform || '';
+  if (platformField) platformField.value = game.platform.split(', ')[0] || ''; // Take first platform if multiple
   
   closeGameModal(context);
 }
