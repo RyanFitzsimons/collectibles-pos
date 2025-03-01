@@ -41,17 +41,11 @@ function render(cart) {
           <button id="close-tcg-modal-buy">Close</button>
         </div>
       </div>
-      <div id="game-modal-buy" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
-        <div style="background: white; margin: 50px auto; padding: 20px; width: 80%; max-height: 80%; overflow-y: auto;">
-          <h4>Select a Game</h4>
-          <div id="game-list-buy" style="display: flex; flex-wrap: wrap; gap: 20px;"></div>
-          <button id="close-game-modal-buy">Close</button>
-        </div>
-      </div>
       <div class="input-group">
         <label>Name</label>
         <input id="buy-name" placeholder="Enter item name" type="text">
       </div>
+      <div id="buy-attributes"></div> <!-- Attributes will be inserted here -->
       <div class="input-group">
         <label>Market Price (\u00A3)</label>
         <input id="buy-price" placeholder="Enter price" type="number">
@@ -70,7 +64,6 @@ function render(cart) {
         <input id="buy-image" type="file" accept="image/*">
       </div>
       <input id="buy-image-url" type="hidden">
-      <div id="buy-attributes"></div>
       <button id="add-to-buy">Add Item</button>
     </div>
     <div class="section">
@@ -121,33 +114,33 @@ function render(cart) {
     const totalPages = Math.ceil(allTcgCards.length / itemsPerPage);
     const startIndex = (currentTcgPage - 1) * itemsPerPage;
     const paginatedCards = allTcgCards.slice(startIndex, startIndex + itemsPerPage);
-
+  
     cardList.innerHTML = '';
     paginatedCards.forEach((card, index) => {
       const cardDiv = document.createElement('div');
-      cardDiv.style = 'border: 1px solid #ccc; padding: 10px; width: 220px; text-align: center;';
+      cardDiv.className = 'bg-secondary rounded-lg shadow p-4 hover:shadow-md transition';
       const priceHtml = `
-        <p><strong>Prices:</strong></p>
+        <p class="text-sm font-semibold text-gray-700">Prices:</p>
         ${Object.entries(card.prices.tcgplayer).map(([rarity, prices]) => `
-          <p>${rarity}: $${prices.market.toFixed(2)} (£${prices.market_gbp.toFixed(2)})</p>
+          <p class="text-xs text-gray-600">${rarity}: $${prices.market.toFixed(2)} (£${prices.market_gbp.toFixed(2)})</p>
         `).join('')}
-        <p>Cardmarket Avg: €${card.prices.cardmarket.average.toFixed(2)} (£${card.prices.cardmarket.average_gbp.toFixed(2)})</p>
+        <p class="text-xs text-gray-600">Cardmarket Avg: €${card.prices.cardmarket.average.toFixed(2)} (£${card.prices.cardmarket.average_gbp.toFixed(2)})</p>
       `;
       cardDiv.innerHTML = `
-        ${card.image_url ? `<img src="${card.image_url}" alt="${card.name}" style="width: auto; height: auto; max-width: 180px; max-height: 250px;">` : 'No Image'}
-        <p><strong>${card.name}</strong></p>
-        <p>Set: ${card.card_set}</p>
-        <p>Rarity: ${card.rarity || 'N/A'}</p>
+        ${card.image_url ? `<img src="${card.image_url}" alt="${card.name}" class="w-full h-auto max-h-64 object-contain mb-2">` : '<p class="text-gray-500">No Image</p>'}
+        <p class="text-lg font-semibold text-gray-800">${card.name}</p>
+        <p class="text-sm text-gray-600">Set: ${card.card_set}</p>
+        <p class="text-sm text-gray-600">Rarity: ${card.rarity || 'N/A'}</p>
         ${priceHtml}
-        <button class="select-tcg-card" data-index="${startIndex + index}">Select</button>
+        <button class="select-tcg-card mt-2 w-full px-3 py-1 bg-accent text-white rounded hover:bg-green-600" data-index="${startIndex + index}">Select</button>
       `;
       cardList.appendChild(cardDiv);
     });
-
+  
     document.getElementById(`tcg-page-info-${context}`).textContent = `Page ${currentTcgPage} of ${totalPages}`;
     document.getElementById(`tcg-prev-page-${context}`).disabled = currentTcgPage === 1;
     document.getElementById(`tcg-next-page-${context}`).disabled = currentTcgPage === totalPages;
-
+  
     document.getElementById(`tcg-prev-page-${context}`).onclick = () => {
       if (currentTcgPage > 1) {
         currentTcgPage--;
@@ -160,8 +153,8 @@ function render(cart) {
         renderTcgModal(context);
       }
     };
-
-    document.getElementById(`tcg-modal-${context}`).style.display = 'flex';
+  
+    document.getElementById(`tcg-modal-${context}`).classList.remove('hidden');
     document.querySelectorAll(`#tcg-card-list-${context} .select-tcg-card`).forEach(button => {
       button.addEventListener('click', () => {
         const index = parseInt(button.dataset.index);
@@ -376,6 +369,10 @@ function updateAttributeFields(context) {
       <div class="input-group">
         <label>Model</label>
         <input id="${context}-model" placeholder="e.g., PS5" type="text">
+      </div>
+      <div class="input-group">
+        <label>Name</label>
+        <input id="${context}-name" placeholder="Enter item name" type="text">
       </div>
     `;
   } else if (type === 'football_shirt') {
