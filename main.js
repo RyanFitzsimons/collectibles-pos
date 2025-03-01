@@ -286,6 +286,37 @@ ipcMain.on('update-inventory-item', (event, item) => {
   );
 });
 
+// Update an inventory item’s attributes
+ipcMain.on('update-item-attributes', (event, { item_id, attributes }) => {
+  // Delete existing attributes for this item
+  db.run('DELETE FROM item_attributes WHERE item_id = ?', [item_id], (err) => {
+    if (err) {
+      console.error('Error deleting old attributes:', err);
+      event.reply('update-attributes-error', err.message);
+      return;
+    }
+    // Insert new attributes
+    const attributeInserts = Object.entries(attributes).map(([key, value]) => 
+      new Promise((resolve, reject) => {
+        db.run('INSERT INTO item_attributes (item_id, key, value) VALUES (?, ?, ?)',
+          [item_id, key, value], (err) => {
+            if (err) reject(err);
+            else resolve();
+          });
+      })
+    );
+    Promise.all(attributeInserts)
+      .then(() => {
+        console.log('Attributes updated for item:', item_id);
+        event.reply('update-attributes-success', { item_id, attributes });
+      })
+      .catch(err => {
+        console.error('Error updating attributes:', err);
+        event.reply('update-attributes-error', err.message);
+      });
+  });
+});
+
 // Fetch transaction data for Transactions tab display
 ipcMain.on('get-transactions', (event) => {
   db.all(`
