@@ -14,11 +14,21 @@ const db = new sqlite3.Database(dbPath, (err) => {
 });
 
 
-// Hardcoded exchange rates (update periodically or use API)
-const EXCHANGE_RATES = {
-  USD_TO_GBP: 0.79, // $1 = £0.79 (as of Mar 2025, approx)
-  EUR_TO_GBP: 0.85  // €1 = £0.85
-};
+// Fetch exchange rates from ExchangeRate-API
+async function getExchangeRates() {
+  try {
+    const response = await axios.get('https://v6.exchangerate-api.com/v6/' + process.env.EXCHANGERATE_API_KEY + '/latest/GBP');
+    const rates = response.data.conversion_rates;
+    console.log('Fetched exchange rates:', rates); // Debug
+    return {
+      USD_TO_GBP: 1 / rates.USD, // Invert: £1 = X USD → $1 = 1/X GBP
+      EUR_TO_GBP: 1 / rates.EUR  // Invert: £1 = X EUR → €1 = 1/X GBP
+    };
+  } catch (err) {
+    console.error('Exchange rate fetch error:', err.message);
+    return { USD_TO_GBP: 0.79, EUR_TO_GBP: 0.85 }; // Fallback
+  }
+}
 
 // Initialize database tables on app start
 db.serialize(() => {
@@ -435,6 +445,8 @@ ipcMain.on('get-tcg-card', async (event, name) => {
       page++;
     }
 
+    const exchangeRates = await getExchangeRates();
+
     const filteredCards = await Promise.all(allCards.map(async (card) => {
       const tcgPrices = card.tcgplayer?.prices || {};
       const cmPrices = card.cardmarket?.prices || {};
@@ -442,7 +454,7 @@ ipcMain.on('get-tcg-card', async (event, name) => {
 
       if (imageUrl) {
         const cacheDir = path.join(__dirname, 'images');
-        const cacheFileName = `${card.id}.png`; // e.g., "1740869570084-base4-10.png"
+        const cacheFileName = `${card.id}.png`;
         const cachePath = path.join(cacheDir, cacheFileName);
 
         if (!fs.existsSync(cachePath)) {
@@ -467,17 +479,17 @@ ipcMain.on('get-tcg-card', async (event, name) => {
             const rarityPrices = tcgPrices[rarity];
             acc[rarity] = {
               market: rarityPrices.market || 0,
-              market_gbp: (rarityPrices.market || 0) * EXCHANGE_RATES.USD_TO_GBP,
+              market_gbp: (rarityPrices.market || 0) * exchangeRates.USD_TO_GBP,
               low: rarityPrices.low || 0,
-              low_gbp: (rarityPrices.low || 0) * EXCHANGE_RATES.USD_TO_GBP
+              low_gbp: (rarityPrices.low || 0) * exchangeRates.USD_TO_GBP
             };
             return acc;
           }, {}),
           cardmarket: {
             average: cmPrices.averageSellPrice || 0,
-            average_gbp: (cmPrices.averageSellPrice || 0) * EXCHANGE_RATES.EUR_TO_GBP,
+            average_gbp: (cmPrices.averageSellPrice || 0) * exchangeRates.EUR_TO_GBP,
             trend: cmPrices.trendPrice || 0,
-            trend_gbp: (cmPrices.trendPrice || 0) * EXCHANGE_RATES.EUR_TO_GBP
+            trend_gbp: (cmPrices.trendPrice || 0) * exchangeRates.EUR_TO_GBP
           }
         }
       };
