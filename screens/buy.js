@@ -234,7 +234,10 @@ function selectTcgCard(card, context) {
   if (tradeValueField) tradeValueField.value = Math.floor(defaultPrice * 0.5);
   if (conditionCategoryField) conditionCategoryField.value = '';
   if (conditionValueField) conditionValueField.value = '';
-  if (imageUrlField) imageUrlField.value = card.image_url || '';
+  if (imageUrlField) {
+    imageUrlField.value = card.image_url || '';
+    console.log(`Set image_url for ${prefix}: ${card.image_url}`); // Debug
+  }
   if (tcgIdField) tcgIdField.value = card.tcg_id || '';
   if (cardSetField) cardSetField.value = card.card_set || '';
   if (rarityField) rarityField.value = card.rarity || '';
@@ -308,6 +311,10 @@ function addToBuy() {
     attributes.year_minted = document.getElementById('buy-year_minted')?.value || null;
   }
 
+  const imageUrlField = document.getElementById('buy-image-url');
+  const imageUrl = imageUrlField?.value || null;
+  console.log('Adding item with image_url:', imageUrl); // Debug
+
   const buyItem = {
     id: Date.now().toString(),
     type,
@@ -315,7 +322,7 @@ function addToBuy() {
     price: parseFloat(document.getElementById('buy-price').value) || 0,
     tradeValue: parseFloat(document.getElementById('buy-trade-value').value) || 0,
     condition: condition || null,
-    image_url: document.getElementById('buy-image-url').value || null,
+    image_url: imageUrl, // Ensure this is the cached file URL
     attributes,
     role: 'trade_in'
   };

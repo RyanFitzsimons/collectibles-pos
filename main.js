@@ -425,30 +425,40 @@ ipcMain.on('get-tcg-card', async (event, name) => {
 
     while (hasMore) {
       const response = await axios.get('https://api.pokemontcg.io/v2/cards', {
-        params: {
-          q: `name:${name}`,
-          page: page,
-          pageSize: 250 // Max page size to fetch more per request
-        },
+        params: { q: `name:${name}`, page: page, pageSize: 250 },
         headers: { 'X-Api-Key': process.env.POKEMON_TCG_API_KEY }
       });
       const cards = response.data.data;
       allCards = allCards.concat(cards);
-      
-      // Check if there's more to fetch (totalCount vs. fetched)
       const totalCount = response.data.totalCount || 0;
       hasMore = allCards.length < totalCount && cards.length > 0;
       page++;
     }
 
-    const filteredCards = allCards.map(card => {
+    const filteredCards = await Promise.all(allCards.map(async (card) => {
       const tcgPrices = card.tcgplayer?.prices || {};
       const cmPrices = card.cardmarket?.prices || {};
+      let imageUrl = card.images.large;
+
+      if (imageUrl) {
+        const cacheDir = path.join(__dirname, 'images');
+        const cacheFileName = `${card.id}.png`; // e.g., "1740869570084-base4-10.png"
+        const cachePath = path.join(cacheDir, cacheFileName);
+
+        if (!fs.existsSync(cachePath)) {
+          const imageResponse = await axios.get(imageUrl, { responseType: 'arraybuffer' });
+          fs.mkdirSync(cacheDir, { recursive: true });
+          fs.writeFileSync(cachePath, Buffer.from(imageResponse.data));
+          console.log('Image cached:', cachePath);
+        }
+        imageUrl = `file://${cachePath}`;
+      }
+
       return {
         id: card.id,
         name: card.name,
         type: 'pokemon_tcg',
-        image_url: card.images.large,
+        image_url: imageUrl,
         tcg_id: card.id,
         card_set: card.set.name,
         rarity: card.rarity,
@@ -471,9 +481,10 @@ ipcMain.on('get-tcg-card', async (event, name) => {
           }
         }
       };
-    });
+    }));
+
     console.log('Fetched TCG card data:', filteredCards);
-    event.reply('tcg-card-data', filteredCards); // Send all cards, no slicing
+    event.reply('tcg-card-data', filteredCards);
   } catch (err) {
     console.error('Pokémon TCG fetch error:', err.message);
     event.reply('tcg-card-error', err.message);
