@@ -108,7 +108,7 @@ function render(cart) {
 
   let allTcgCards = [];
   let currentTcgPage = 1;
-  const itemsPerPage = 10;
+  const itemsPerPage = 12;
 
   ipcRenderer.on('tcg-card-data', (event, cards) => {
     allTcgCards = cards;

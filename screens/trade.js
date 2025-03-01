@@ -179,7 +179,7 @@ function render(page, searchTerm, inCart, outCart, inventory = null, total = nul
 
   let allTcgCards = [];
   let currentTcgPage = 1;
-  const itemsPerPage = 10;
+  const itemsPerPage = 12;
 
   ipcRenderer.removeAllListeners('tcg-card-data');
   ipcRenderer.on('tcg-card-data', (event, cards) => {
