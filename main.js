@@ -32,7 +32,7 @@ db.serialize(() => {
     else console.log('Transactions table created or already exists');
   });
   // Create table for items within transactions (links items to transactions)
-  db.run('CREATE TABLE IF NOT EXISTS transaction_items (id INTEGER PRIMARY KEY AUTOINCREMENT, transaction_id TEXT, item_id TEXT, name TEXT, role TEXT, trade_value REAL, negotiated_price REAL, original_price REAL, image_url TEXT, condition TEXT, card_set TEXT)', (err) => {
+  db.run('CREATE TABLE IF NOT EXISTS transaction_items (id INTEGER PRIMARY KEY AUTOINCREMENT, transaction_id TEXT, item_id TEXT, name TEXT, role TEXT, trade_value REAL, negotiated_price REAL, original_price REAL, image_url TEXT, condition TEXT, type TEXT, attributes TEXT)', (err) => {
     if (err) console.error('Error creating transaction_items table:', err);
     else console.log('Transaction_items table created or already exists');
   });
@@ -161,24 +161,26 @@ ipcMain.on('complete-transaction', (event, { items, type, cashIn, cashOut }) => 
         console.error('Transaction insert error:', err);
         return event.reply('transaction-error', err.message);
       }
-      // Record each item in the transaction
+      // Record each item in the transaction with attributes
       const itemInserts = items.map(item => new Promise((resolve, reject) => {
+        const attributesJson = JSON.stringify(item.attributes || {});
         if (item.role === 'trade_in') {
           const imageUrl = item.image_url && !item.image_url.startsWith('file://') 
             ? `file://${path.join(__dirname, 'images', `${item.id}-${item.tcg_id || 'item'}.png`)}` 
             : item.image_url;
-          db.run('INSERT INTO transaction_items (transaction_id, item_id, name, role, trade_value, original_price, image_url, condition, card_set) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [txId, item.id, item.name, item.role, item.tradeValue, item.price, imageUrl, item.condition, item.card_set], (err) => {
+          db.run('INSERT INTO transaction_items (transaction_id, item_id, name, role, trade_value, original_price, image_url, condition, type, attributes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [txId, item.id, item.name, item.role, item.tradeValue, item.price, imageUrl, item.condition, item.type, attributesJson], (err) => {
               if (err) reject(err);
               else resolve();
             });
         } else if (item.role === 'sold' || item.role === 'trade_out') {
-          db.get('SELECT image_url, condition FROM items WHERE id = ?', [item.id], (err, row) => {
+          db.get('SELECT image_url, condition, type FROM items WHERE id = ?', [item.id], (err, row) => {
             if (err) return reject(err);
             const imageUrl = row ? row.image_url : item.image_url;
             const condition = row ? row.condition : item.condition;
-            db.run('INSERT INTO transaction_items (transaction_id, item_id, name, role, negotiated_price, original_price, image_url, condition) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-              [txId, item.id, item.name, item.role, item.negotiatedPrice, item.price, imageUrl, condition], (err) => {
+            const itemType = row ? row.type : item.type;
+            db.run('INSERT INTO transaction_items (transaction_id, item_id, name, role, negotiated_price, original_price, image_url, condition, type, attributes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+              [txId, item.id, item.name, item.role, item.negotiatedPrice, item.price, imageUrl, condition, itemType, attributesJson], (err) => {
                 if (err) reject(err);
                 else resolve();
               });
@@ -333,8 +335,9 @@ ipcMain.on('get-transactions', (event) => {
       ti.negotiated_price, 
       ti.original_price, 
       ti.image_url, 
-      ti.condition, 
-      ti.card_set
+      ti.condition,
+      ti.type,
+      ti.attributes
     FROM transactions t
     LEFT JOIN transaction_items ti ON t.id = ti.transaction_id
   `, (err, rows) => {

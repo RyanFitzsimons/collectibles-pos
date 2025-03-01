@@ -20,6 +20,7 @@ function render() {
         };
       }
       if (row.item_id) {
+        const attributes = row.attributes ? JSON.parse(row.attributes) : {};
         transactions[txId].items.push({
           item_id: row.item_id,
           name: row.item_name,
@@ -29,7 +30,8 @@ function render() {
           original_price: row.original_price,
           image_url: row.image_url,
           condition: row.condition,
-          card_set: row.card_set
+          type: row.type,
+          attributes
         });
       }
     });
@@ -100,7 +102,7 @@ function render() {
                       ${tx.items.map(item => `
                         <li>
                           ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}">` : ''}
-                          ${item.name} (${item.card_set || 'Unknown Set'}) (${item.condition || 'Not Set'}) (${item.role === 'trade_in' ? 'Trade-In' : item.role === 'trade_out' ? 'Trade-Out' : 'Sold'}) - 
+                          ${item.name} (${item.type}${formatAttributes(item.attributes)}) (${item.condition || 'Not Set'}) (${item.role === 'trade_in' ? 'Trade-In' : item.role === 'trade_out' ? 'Trade-Out' : 'Sold'}) - 
                           ${item.role === 'trade_in' ? `Trade Value: ${cleanPrice(item.trade_value || 0)}` : `Sold For: ${cleanPrice(item.negotiated_price || item.original_price || 0)}`}
                         </li>
                       `).join('')}
@@ -173,7 +175,7 @@ function render() {
         let csvContent = 'ID,Type,Cash In,Cash Out,Timestamp,Items\n';
         filteredTransactions.forEach(([id, tx]) => {
           const itemsStr = tx.items.map(item => 
-            `${item.name} (${item.card_set || 'Unknown Set'}) (${item.condition || 'Not Set'}) (${item.role === 'trade_in' ? 'Trade-In' : item.role === 'trade_out' ? 'Trade-Out' : 'Sold'}) - ${item.role === 'trade_in' ? cleanPrice(item.trade_value || 0) : cleanPrice(item.negotiated_price || item.original_price || 0)}`
+            `${item.name} (${item.type}${formatAttributes(item.attributes)}) (${item.condition || 'Not Set'}) (${item.role === 'trade_in' ? 'Trade-In' : item.role === 'trade_out' ? 'Trade-Out' : 'Sold'}) - ${item.role === 'trade_in' ? cleanPrice(item.trade_value || 0) : cleanPrice(item.negotiated_price || item.original_price || 0)}`
           ).join('; ');
           csvContent += `${id},${tx.type || 'Unknown'},${cleanPrice(tx.cash_in || 0)},${cleanPrice(tx.cash_out || 0)},${tx.timestamp},"${itemsStr.replace(/"/g, '""')}"\n`;
         });
@@ -224,6 +226,11 @@ function render() {
         });
         currentPage = 1;
         renderTransactions(sortedTransactions);
+      }
+
+      function formatAttributes(attributes) {
+        if (!attributes || Object.keys(attributes).length === 0) return '';
+        return ' - ' + Object.entries(attributes).map(([key, value]) => `${key}: ${value}`).join(', ');
       }
     }
 
