@@ -4,7 +4,6 @@ const path = require('path');
 const fs = require('fs');
 const sqlite3 = require('sqlite3').verbose();
 const axios = require('axios');
-
 const dbPath = path.join(__dirname, 'inventory.db');
 const db = new sqlite3.Database(dbPath, (err) => {
   if (err) {
@@ -13,6 +12,13 @@ const db = new sqlite3.Database(dbPath, (err) => {
     console.log('Database opened successfully:', dbPath);
   }
 });
+
+
+// Hardcoded exchange rates (update periodically or use API)
+const EXCHANGE_RATES = {
+  USD_TO_GBP: 0.79, // $1 = £0.79 (as of Mar 2025, approx)
+  EUR_TO_GBP: 0.85  // €1 = £0.85
+};
 
 // Initialize database tables on app start
 db.serialize(() => {
@@ -410,48 +416,51 @@ ipcMain.on('get-reconciliations', (event) => {
   });
 });
 
-// Fetch TCG card data from API or DB for Buy/Trade-In
-ipcMain.on('get-tcg-card', (event, cardName) => {
-  console.log('Fetching TCG card:', cardName);
-  const options = {
-    method: 'GET',
-    url: 'https://api.pokemontcg.io/v2/cards',
-    headers: { 'X-Api-Key': process.env.TCG_API_KEY || 'your-api-key-here' },
-    params: { q: `name:${cardName}` }
-  };
-
-  axios.request(options)
-    .then(response => {
-      const cards = response.data.data.map(card => ({
-        tcg_id: card.id,
-        name: card.name,
-        type: 'pokemon_tcg', // Default to Pokémon TCG for now
-        price: card.cardmarket?.prices?.averageSellPrice || 0,
-        tradeValue: card.cardmarket?.prices?.averageSellPrice * 0.5 || 0,
-        image_url: card.images.small,
-        card_set: card.set.name,
-        rarity: card.rarity
-      }));
-      console.log('API returned:', cards.length, 'cards');
-      event.reply('tcg-card-data', cards);
-    })
-    .catch(err => {
-      console.error('TCG API error, falling back to DB:', err.message);
-      db.all('SELECT i.*, GROUP_CONCAT(a.key || ":" || a.value) as attributes FROM items i LEFT JOIN item_attributes a ON i.id = a.item_id WHERE i.name LIKE ? GROUP BY i.id', [`%${cardName}%`], (dbErr, rows) => {
-        if (dbErr) {
-          console.error('Database error:', dbErr);
-          event.reply('tcg-card-error', dbErr);
-          return;
-        }
-        const formattedRows = rows.map(row => ({
-          ...row,
-          attributes: row.attributes ? Object.fromEntries(row.attributes.split(',').map(attr => attr.split(':'))) : {},
-          type: row.type || 'pokemon_tcg' // Default for backward compatibility
-        }));
-        console.log('Found in DB:', formattedRows.length, 'matches');
-        event.reply('tcg-card-data', formattedRows);
-      });
+// Fetch Pokémon TCG card data with detailed pricing using direct API
+ipcMain.on('get-tcg-card', async (event, name) => {
+  try {
+    const response = await axios.get('https://api.pokemontcg.io/v2/cards', {
+      params: { q: `name:${name}` },
+      headers: { 'X-Api-Key': process.env.POKEMON_TCG_API_KEY }
     });
+    const cards = response.data.data;
+    const filteredCards = cards.map(card => {
+      const tcgPrices = card.tcgplayer?.prices || {};
+      const cmPrices = card.cardmarket?.prices || {};
+      return {
+        id: card.id,
+        name: card.name,
+        type: 'pokemon_tcg',
+        image_url: card.images.large,
+        tcg_id: card.id,
+        card_set: card.set.name,
+        rarity: card.rarity,
+        prices: {
+          tcgplayer: Object.keys(tcgPrices).reduce((acc, rarity) => {
+            const rarityPrices = tcgPrices[rarity];
+            acc[rarity] = {
+              market: rarityPrices.market || 0,
+              market_gbp: (rarityPrices.market || 0) * EXCHANGE_RATES.USD_TO_GBP,
+              low: rarityPrices.low || 0,
+              low_gbp: (rarityPrices.low || 0) * EXCHANGE_RATES.USD_TO_GBP
+            };
+            return acc;
+          }, {}),
+          cardmarket: {
+            average: cmPrices.averageSellPrice || 0,
+            average_gbp: (cmPrices.averageSellPrice || 0) * EXCHANGE_RATES.EUR_TO_GBP,
+            trend: cmPrices.trendPrice || 0,
+            trend_gbp: (cmPrices.trendPrice || 0) * EXCHANGE_RATES.EUR_TO_GBP
+          }
+        }
+      };
+    });
+    console.log('Fetched TCG card data:', filteredCards);
+    event.reply('tcg-card-data', filteredCards.slice(0, 10));
+  } catch (err) {
+    console.error('Pokémon TCG fetch error:', err.message);
+    event.reply('tcg-card-error', err.message);
+  }
 });
 
 // Fetch video game data from Giant Bomb API

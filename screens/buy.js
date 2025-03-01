@@ -2,7 +2,6 @@ const { ipcRenderer } = require('electron');
 const { cleanPrice } = require('../utils');
 const { buyItems } = require('../cart');
 
-// Render the Buy tab UI with cart and type selector
 function render(cart) {
   const totalPayout = cart.reduce((sum, item) => sum + item.tradeValue, 0);
   const content = document.getElementById('content');
@@ -102,6 +101,38 @@ function render(cart) {
   document.getElementById('complete-buy').addEventListener('click', completeBuyTransaction);
   document.getElementById('clear-buy-cart').addEventListener('click', clearBuyCart);
 
+  ipcRenderer.on('tcg-card-data', (event, cards) => {
+    const cardList = document.getElementById('tcg-card-list-buy');
+    cardList.innerHTML = '';
+    cards.forEach((card, index) => {
+      const cardDiv = document.createElement('div');
+      cardDiv.style = 'border: 1px solid #ccc; padding: 10px; width: 220px; text-align: center;';
+      const priceHtml = `
+        <p><strong>Prices:</strong></p>
+        ${Object.entries(card.prices.tcgplayer).map(([rarity, prices]) => `
+          <p>${rarity}: $${prices.market.toFixed(2)} (£${prices.market_gbp.toFixed(2)})</p>
+        `).join('')}
+        <p>Cardmarket Avg: €${card.prices.cardmarket.average.toFixed(2)} (£${card.prices.cardmarket.average_gbp.toFixed(2)})</p>
+      `;
+      cardDiv.innerHTML = `
+        ${card.image_url ? `<img src="${card.image_url}" alt="${card.name}" style="width: auto; height: auto; max-width: 180px; max-height: 250px;">` : 'No Image'}
+        <p><strong>${card.name}</strong></p>
+        <p>Set: ${card.card_set}</p>
+        <p>Rarity: ${card.rarity || 'N/A'}</p>
+        ${priceHtml}
+        <button class="select-tcg-card" data-index="${index}">Select</button>
+      `;
+      cardList.appendChild(cardDiv);
+    });
+    document.getElementById('tcg-modal-buy').style.display = 'flex';
+    document.querySelectorAll('#tcg-card-list-buy .select-tcg-card').forEach(button => {
+      button.addEventListener('click', () => {
+        const index = parseInt(button.dataset.index);
+        selectTcgCard(cards[index], 'buy');
+      });
+    });
+  });
+
   ipcRenderer.on('game-data', (event, games) => {
     const gameList = document.getElementById('game-list-buy');
     gameList.innerHTML = '';
@@ -119,7 +150,6 @@ function render(cart) {
       gameList.appendChild(gameDiv);
     });
     document.getElementById('game-modal-buy').style.display = 'flex';
-
     document.querySelectorAll('#game-list-buy .select-game').forEach(button => {
       button.addEventListener('click', () => {
         const index = parseInt(button.dataset.index);
@@ -127,10 +157,11 @@ function render(cart) {
       });
     });
   });
+
+  ipcRenderer.on('tcg-card-error', (event, error) => console.error('TCG card fetch error:', error));
   ipcRenderer.on('game-data-error', (event, error) => console.error('Game data fetch error:', error));
 }
 
-// Fetch TCG card data (unchanged)
 function fetchTcgCard(context) {
   const input = document.getElementById(`${context}-tcg-card-name`);
   if (!input) return console.error(`No input found for context: ${context}`);
@@ -138,38 +169,8 @@ function fetchTcgCard(context) {
   if (!cardName) return console.error('No card name provided for', context);
   console.log(`Fetching TCG card for ${context}:`, cardName);
   ipcRenderer.send('get-tcg-card', cardName);
-  ipcRenderer.once('tcg-card-data', (event, cards) => {
-    console.log(`Received TCG card data for ${context}:`, cards);
-    const cardList = document.getElementById(`tcg-card-list-${context}`);
-    if (!cardList) return console.error(`No card list found for context: ${context}`);
-    cardList.innerHTML = '';
-    cards.forEach((card, index) => {
-      const cardDiv = document.createElement('div');
-      cardDiv.style = 'border: 1px solid #ccc; padding: 10px; width: 200px; text-align: center;';
-      cardDiv.innerHTML = `
-        <img src="${card.image_url}" alt="${card.name}" style="width: auto; height: auto; max-width: 180px; max-height: 250px;">
-        <p><strong>${card.name}</strong></p>
-        <p>Set: ${card.card_set}</p>
-        <p>Rarity: ${card.rarity}</p>
-        <p>Price: ${cleanPrice(card.price.toFixed(2))}</p>
-        <button class="select-tcg-card" data-index="${index}">Select</button>
-      `;
-      cardList.appendChild(cardDiv);
-    });
-    const modal = document.getElementById(`tcg-modal-${context}`);
-    if (modal) modal.style.display = 'flex';
-
-    document.querySelectorAll(`#tcg-card-list-${context} .select-tcg-card`).forEach(button => {
-      button.addEventListener('click', () => {
-        const index = parseInt(button.dataset.index);
-        selectTcgCard(cards[index], context);
-      });
-    });
-  });
-  ipcRenderer.once('tcg-card-error', (event, error) => console.error(`TCG card fetch failed for ${context}:`, error));
 }
 
-// Select TCG card (unchanged)
 function selectTcgCard(card, context) {
   console.log(`Selected TCG card for ${context}:`, card);
   const prefix = context;
@@ -187,10 +188,12 @@ function selectTcgCard(card, context) {
   const rarityField = document.getElementById(`${prefix}-rarity`);
 
   if (nameField) nameField.value = card.name;
-  if (priceField) priceField.value = card.price;
-  if (tradeValueField) tradeValueField.value = Math.floor(card.price * 0.5);
+  // Default to TCGPlayer holofoil market GBP or Cardmarket average GBP
+  const defaultPrice = card.prices.tcgplayer.holofoil?.market_gbp || card.prices.cardmarket.average_gbp || 0;
+  if (priceField) priceField.value = defaultPrice;
+  if (tradeValueField) tradeValueField.value = Math.floor(defaultPrice * 0.5);
   if (conditionCategoryField) conditionCategoryField.value = '';
-  if (conditionValueField) conditionValueField.value = card.condition || '';
+  if (conditionValueField) conditionValueField.value = '';
   if (imageUrlField) imageUrlField.value = card.image_url || '';
   if (tcgIdField) tcgIdField.value = card.tcg_id || '';
   if (cardSetField) cardSetField.value = card.card_set || '';
@@ -199,21 +202,16 @@ function selectTcgCard(card, context) {
   closeTcgModal(context);
 }
 
-// Fetch game data from Giant Bomb
 function fetchGameData() {
   const type = document.getElementById('buy-type-selector').value;
   if (type !== 'video_game') return;
   const name = document.getElementById('buy-game-name').value || document.getElementById('buy-name').value;
-  const platform = document.getElementById('buy-platform').value || ''; // Optional
-  if (!name) {
-    console.error('Name required for video game fetch');
-    return;
-  }
+  const platform = document.getElementById('buy-platform').value || '';
+  if (!name) return console.error('Name required for video game fetch');
   console.log('Fetching game data for:', name, platform || 'all platforms');
   ipcRenderer.send('get-game-data', { name, platform });
 }
 
-// Select game from Giant Bomb data
 function selectGame(game, context) {
   console.log(`Selected game for ${context}:`, game);
   const prefix = context;
@@ -229,27 +227,24 @@ function selectGame(game, context) {
   const platformField = document.getElementById(`${prefix}-platform`);
 
   if (nameField) nameField.value = game.name;
-  if (priceField) priceField.value = game.price; // 0, user can adjust
-  if (tradeValueField) tradeValueField.value = game.tradeValue; // 0, user can adjust
+  if (priceField) priceField.value = game.price;
+  if (tradeValueField) tradeValueField.value = game.tradeValue;
   if (conditionCategoryField) conditionCategoryField.value = '';
   if (conditionValueField) conditionValueField.value = '';
   if (imageUrlField) imageUrlField.value = game.image_url || '';
-  if (platformField) platformField.value = game.platform.split(', ')[0] || ''; // Take first platform if multiple
+  if (platformField) platformField.value = game.platform.split(', ')[0] || '';
   
   closeGameModal(context);
 }
 
-// Hide TCG modal (unchanged)
 function closeTcgModal(context) {
   document.getElementById(`tcg-modal-${context}`).style.display = 'none';
 }
 
-// Hide game modal
 function closeGameModal(context) {
   document.getElementById(`game-modal-${context}`).style.display = 'none';
 }
 
-// Add item to Buy cart (unchanged)
 function addToBuy() {
   const conditionCategory = document.getElementById('buy-condition-category').value;
   const conditionValue = document.getElementById('buy-condition-value').value;
@@ -289,7 +284,6 @@ function addToBuy() {
   render(buyItems);
 }
 
-// Complete Buy transaction (unchanged)
 function completeBuyTransaction() {
   console.log('Completing buy transaction:', { buyItems });
   const items = buyItems.slice();
@@ -310,13 +304,11 @@ function completeBuyTransaction() {
   ipcRenderer.once('transaction-error', (event, error) => console.error('Buy transaction failed:', error));
 }
 
-// Clear Buy cart (unchanged)
 function clearBuyCart() {
   buyItems.length = 0;
   require('../renderer').showScreen('buy');
 }
 
-// Update attribute fields (unchanged)
 function updateAttributeFields(context) {
   const type = document.getElementById(`${context}-type-selector`).value;
   const attributesDiv = document.getElementById(`${context}-attributes`);
@@ -375,7 +367,6 @@ function updateAttributeFields(context) {
   }
 }
 
-// Update condition options (unchanged)
 function updateConditionOptions(context) {
   const type = document.getElementById(`${context}-type-selector`).value;
   const conditionSelect = document.getElementById(`${context}-condition-category`);
