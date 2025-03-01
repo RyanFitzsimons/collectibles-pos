@@ -46,16 +46,8 @@ function render(cart) {
       </div>
       <div class="input-group">
         <label>Condition</label>
-        <select id="buy-condition-category">
-          <option value="">Select Category</option>
-          <option value="Raw">Raw</option>
-          <option value="PSA">PSA</option>
-          <option value="CGC">CGC</option>
-          <option value="BGS">BGS</option>
-          <option value="TAG">TAG</option>
-          <option value="Other">Other</option>
-        </select>
-        <input id="buy-condition-value" placeholder="e.g., NM, 7" type="text">
+        <select id="buy-condition-category"></select>
+        <input id="buy-condition-value" placeholder="e.g., 9, scratches" type="text">
       </div>
       <div class="input-group">
         <label>Image</label>
@@ -81,13 +73,15 @@ function render(cart) {
     </div>
   `;
 
-  // Add event listeners after DOM is rendered
+  // Add event listeners after DOM render
   const typeSelector = document.getElementById('buy-type-selector');
   typeSelector.addEventListener('change', () => {
-    console.log('Type changed to:', typeSelector.value); // Debug log
+    console.log('Type changed to:', typeSelector.value);
     updateAttributeFields('buy');
+    updateConditionOptions('buy');
   });
-  updateAttributeFields('buy'); // Initial call
+  updateAttributeFields('buy');
+  updateConditionOptions('buy');
 
   document.getElementById('fetch-buy-card')?.addEventListener('click', () => fetchTcgCard('buy'));
   document.getElementById('close-tcg-modal-buy')?.addEventListener('click', () => closeTcgModal('buy'));
@@ -148,8 +142,9 @@ function fetchTcgCard(context) {
 function selectTcgCard(card, context) {
   console.log(`Selected TCG card for ${context}:`, card);
   const prefix = context;
-  document.getElementById(`${prefix}-type-selector`).value = 'pokemon_tcg'; // Set type
-  updateAttributeFields(context); // Update fields
+  document.getElementById(`${prefix}-type-selector`).value = 'pokemon_tcg';
+  updateAttributeFields(context);
+  updateConditionOptions(context);
   const nameField = document.getElementById(`${prefix}-name`);
   const priceField = document.getElementById(`${prefix}-price`);
   const tradeValueField = document.getElementById(`${prefix}-trade-value`);
@@ -215,7 +210,7 @@ function addToBuy() {
   };
   buyItems.push(buyItem);
   console.log('Adding to buy cart:', buyItem);
-  render(buyItems); // Refresh Buy tab with updated cart
+  render(buyItems);
 }
 
 // Complete a Buy transaction, add items to inventory, and clear the cart
@@ -225,9 +220,8 @@ function completeBuyTransaction() {
   const cashIn = 0;
   const cashOut = buyItems.reduce((sum, item) => sum + parseFloat(item.tradeValue), 0);
   
-  // Add items to inventory only on completion
   items.forEach(item => {
-    const itemData = { ...item, ...item.attributes }; // Flatten attributes for backward compatibility
+    const itemData = { ...item, ...item.attributes };
     ipcRenderer.send('add-item', itemData);
   });
   
@@ -253,7 +247,7 @@ function updateAttributeFields(context) {
   const tcgFetchDiv = document.getElementById(`${context}-tcg-fetch`);
   attributesDiv.innerHTML = '';
   if (tcgFetchDiv) {
-    console.log('Updating TCG fetch visibility for', type); // Debug log
+    console.log('Updating TCG fetch visibility for', type);
     tcgFetchDiv.style.display = (type === 'pokemon_tcg' || type === 'other_tcg') ? 'block' : 'none';
   }
 
@@ -304,6 +298,29 @@ function updateAttributeFields(context) {
       </div>
     `;
   }
+}
+
+// Update condition options based on selected type
+function updateConditionOptions(context) {
+  const type = document.getElementById(`${context}-type-selector`).value;
+  const conditionSelect = document.getElementById(`${context}-condition-category`);
+  conditionSelect.innerHTML = '<option value="">Select Condition</option>';
+
+  const options = {
+    'pokemon_tcg': ['Raw', 'PSA', 'CGC', 'BGS', 'TAG', 'Other'],
+    'other_tcg': ['Raw', 'PSA', 'CGC', 'BGS', 'TAG', 'Other'],
+    'video_game': ['New', 'Used', 'CIB', 'Loose', 'Graded'],
+    'console': ['New', 'Used', 'Refurbished', 'Broken'],
+    'football_shirt': ['New', 'Worn', 'Signed', 'Game-Worn'],
+    'coin': ['Uncirculated', 'Circulated', 'Proof', 'Graded']
+  }[type] || [];
+
+  options.forEach(option => {
+    const opt = document.createElement('option');
+    opt.value = option;
+    opt.text = option;
+    conditionSelect.appendChild(opt);
+  });
 }
 
 module.exports = { render, fetchTcgCard, selectTcgCard, closeTcgModal, addToBuy, completeBuyTransaction, clearBuyCart, updateAttributeFields };
