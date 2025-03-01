@@ -33,6 +33,11 @@ function render(cart) {
         <div style="background: white; margin: 50px auto; padding: 20px; width: 80%; max-height: 80%; overflow-y: auto;">
           <h4>Select a Card</h4>
           <div id="tcg-card-list-buy" style="display: flex; flex-wrap: wrap; gap: 20px;"></div>
+          <div style="margin-top: 20px;">
+            <button id="tcg-prev-page-buy" disabled>Previous</button>
+            <span id="tcg-page-info-buy">Page 1</span>
+            <button id="tcg-next-page-buy">Next</button>
+          </div>
           <button id="close-tcg-modal-buy">Close</button>
         </div>
       </div>
@@ -101,10 +106,24 @@ function render(cart) {
   document.getElementById('complete-buy').addEventListener('click', completeBuyTransaction);
   document.getElementById('clear-buy-cart').addEventListener('click', clearBuyCart);
 
+  let allTcgCards = [];
+  let currentTcgPage = 1;
+  const itemsPerPage = 10;
+
   ipcRenderer.on('tcg-card-data', (event, cards) => {
-    const cardList = document.getElementById('tcg-card-list-buy');
+    allTcgCards = cards;
+    currentTcgPage = 1;
+    renderTcgModal('buy');
+  });
+
+  function renderTcgModal(context) {
+    const cardList = document.getElementById(`tcg-card-list-${context}`);
+    const totalPages = Math.ceil(allTcgCards.length / itemsPerPage);
+    const startIndex = (currentTcgPage - 1) * itemsPerPage;
+    const paginatedCards = allTcgCards.slice(startIndex, startIndex + itemsPerPage);
+
     cardList.innerHTML = '';
-    cards.forEach((card, index) => {
+    paginatedCards.forEach((card, index) => {
       const cardDiv = document.createElement('div');
       cardDiv.style = 'border: 1px solid #ccc; padding: 10px; width: 220px; text-align: center;';
       const priceHtml = `
@@ -120,18 +139,36 @@ function render(cart) {
         <p>Set: ${card.card_set}</p>
         <p>Rarity: ${card.rarity || 'N/A'}</p>
         ${priceHtml}
-        <button class="select-tcg-card" data-index="${index}">Select</button>
+        <button class="select-tcg-card" data-index="${startIndex + index}">Select</button>
       `;
       cardList.appendChild(cardDiv);
     });
-    document.getElementById('tcg-modal-buy').style.display = 'flex';
-    document.querySelectorAll('#tcg-card-list-buy .select-tcg-card').forEach(button => {
+
+    document.getElementById(`tcg-page-info-${context}`).textContent = `Page ${currentTcgPage} of ${totalPages}`;
+    document.getElementById(`tcg-prev-page-${context}`).disabled = currentTcgPage === 1;
+    document.getElementById(`tcg-next-page-${context}`).disabled = currentTcgPage === totalPages;
+
+    document.getElementById(`tcg-prev-page-${context}`).onclick = () => {
+      if (currentTcgPage > 1) {
+        currentTcgPage--;
+        renderTcgModal(context);
+      }
+    };
+    document.getElementById(`tcg-next-page-${context}`).onclick = () => {
+      if (currentTcgPage < totalPages) {
+        currentTcgPage++;
+        renderTcgModal(context);
+      }
+    };
+
+    document.getElementById(`tcg-modal-${context}`).style.display = 'flex';
+    document.querySelectorAll(`#tcg-card-list-${context} .select-tcg-card`).forEach(button => {
       button.addEventListener('click', () => {
         const index = parseInt(button.dataset.index);
-        selectTcgCard(cards[index], 'buy');
+        selectTcgCard(allTcgCards[index], context);
       });
     });
-  });
+  }
 
   ipcRenderer.on('game-data', (event, games) => {
     const gameList = document.getElementById('game-list-buy');
@@ -188,7 +225,6 @@ function selectTcgCard(card, context) {
   const rarityField = document.getElementById(`${prefix}-rarity`);
 
   if (nameField) nameField.value = card.name;
-  // Default to TCGPlayer holofoil market GBP or Cardmarket average GBP
   const defaultPrice = card.prices.tcgplayer.holofoil?.market_gbp || card.prices.cardmarket.average_gbp || 0;
   if (priceField) priceField.value = defaultPrice;
   if (tradeValueField) tradeValueField.value = Math.floor(defaultPrice * 0.5);

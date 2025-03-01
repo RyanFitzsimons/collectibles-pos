@@ -52,6 +52,11 @@ function render(page, searchTerm, inCart, outCart, inventory = null, total = nul
             <div style="background: white; margin: 50px auto; padding: 20px; width: 80%; max-height: 80%; overflow-y: auto;">
               <h4>Select a Card</h4>
               <div id="tcg-card-list-trade-in" style="display: flex; flex-wrap: wrap; gap: 20px;"></div>
+              <div style="margin-top: 20px;">
+                <button id="tcg-prev-page-trade-in" disabled>Previous</button>
+                <span id="tcg-page-info-trade-in">Page 1</span>
+                <button id="tcg-next-page-trade-in">Next</button>
+              </div>
               <button id="close-tcg-modal-trade-in">Close</button>
             </div>
           </div>
@@ -172,12 +177,25 @@ function render(page, searchTerm, inCart, outCart, inventory = null, total = nul
     input.addEventListener('change', (e) => updateTradeOutPrice(input.dataset.id, e.target.value));
   });
 
+  let allTcgCards = [];
+  let currentTcgPage = 1;
+  const itemsPerPage = 10;
+
   ipcRenderer.removeAllListeners('tcg-card-data');
   ipcRenderer.on('tcg-card-data', (event, cards) => {
-    const cardList = document.getElementById('tcg-card-list-trade-in');
-    if (!cardList) return console.error('TCG card list not found in DOM');
+    allTcgCards = cards;
+    currentTcgPage = 1;
+    renderTcgModal('trade-in');
+  });
+
+  function renderTcgModal(context) {
+    const cardList = document.getElementById(`tcg-card-list-${context}`);
+    const totalPages = Math.ceil(allTcgCards.length / itemsPerPage);
+    const startIndex = (currentTcgPage - 1) * itemsPerPage;
+    const paginatedCards = allTcgCards.slice(startIndex, startIndex + itemsPerPage);
+
     cardList.innerHTML = '';
-    cards.forEach((card, index) => {
+    paginatedCards.forEach((card, index) => {
       const cardDiv = document.createElement('div');
       cardDiv.style = 'border: 1px solid #ccc; padding: 10px; width: 220px; text-align: center;';
       const priceHtml = `
@@ -193,19 +211,36 @@ function render(page, searchTerm, inCart, outCart, inventory = null, total = nul
         <p>Set: ${card.card_set}</p>
         <p>Rarity: ${card.rarity || 'N/A'}</p>
         ${priceHtml}
-        <button class="select-tcg-card" data-index="${index}">Select</button>
+        <button class="select-tcg-card" data-index="${startIndex + index}">Select</button>
       `;
       cardList.appendChild(cardDiv);
     });
-    const modal = document.getElementById('tcg-modal-trade-in');
-    if (modal) modal.style.display = 'flex';
-    document.querySelectorAll('#tcg-card-list-trade-in .select-tcg-card').forEach(button => {
+
+    document.getElementById(`tcg-page-info-${context}`).textContent = `Page ${currentTcgPage} of ${totalPages}`;
+    document.getElementById(`tcg-prev-page-${context}`).disabled = currentTcgPage === 1;
+    document.getElementById(`tcg-next-page-${context}`).disabled = currentTcgPage === totalPages;
+
+    document.getElementById(`tcg-prev-page-${context}`).onclick = () => {
+      if (currentTcgPage > 1) {
+        currentTcgPage--;
+        renderTcgModal(context);
+      }
+    };
+    document.getElementById(`tcg-next-page-${context}`).onclick = () => {
+      if (currentTcgPage < totalPages) {
+        currentTcgPage++;
+        renderTcgModal(context);
+      }
+    };
+
+    document.getElementById(`tcg-modal-${context}`).style.display = 'flex';
+    document.querySelectorAll(`#tcg-card-list-${context} .select-tcg-card`).forEach(button => {
       button.addEventListener('click', () => {
         const index = parseInt(button.dataset.index);
-        selectTcgCard(cards[index], 'trade-in');
+        selectTcgCard(allTcgCards[index], context);
       });
     });
-  });
+  }
 
   ipcRenderer.removeAllListeners('game-data');
   ipcRenderer.on('game-data', (event, games) => {

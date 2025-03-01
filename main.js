@@ -416,15 +416,32 @@ ipcMain.on('get-reconciliations', (event) => {
   });
 });
 
-// Fetch Pokémon TCG card data with detailed pricing using direct API
+// Fetch all Pokémon TCG cards with detailed pricing
 ipcMain.on('get-tcg-card', async (event, name) => {
   try {
-    const response = await axios.get('https://api.pokemontcg.io/v2/cards', {
-      params: { q: `name:${name}` },
-      headers: { 'X-Api-Key': process.env.POKEMON_TCG_API_KEY }
-    });
-    const cards = response.data.data;
-    const filteredCards = cards.map(card => {
+    let allCards = [];
+    let page = 1;
+    let hasMore = true;
+
+    while (hasMore) {
+      const response = await axios.get('https://api.pokemontcg.io/v2/cards', {
+        params: {
+          q: `name:${name}`,
+          page: page,
+          pageSize: 250 // Max page size to fetch more per request
+        },
+        headers: { 'X-Api-Key': process.env.POKEMON_TCG_API_KEY }
+      });
+      const cards = response.data.data;
+      allCards = allCards.concat(cards);
+      
+      // Check if there's more to fetch (totalCount vs. fetched)
+      const totalCount = response.data.totalCount || 0;
+      hasMore = allCards.length < totalCount && cards.length > 0;
+      page++;
+    }
+
+    const filteredCards = allCards.map(card => {
       const tcgPrices = card.tcgplayer?.prices || {};
       const cmPrices = card.cardmarket?.prices || {};
       return {
@@ -456,7 +473,7 @@ ipcMain.on('get-tcg-card', async (event, name) => {
       };
     });
     console.log('Fetched TCG card data:', filteredCards);
-    event.reply('tcg-card-data', filteredCards.slice(0, 10));
+    event.reply('tcg-card-data', filteredCards); // Send all cards, no slicing
   } catch (err) {
     console.error('Pokémon TCG fetch error:', err.message);
     event.reply('tcg-card-error', err.message);
