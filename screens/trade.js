@@ -2,7 +2,7 @@ const { ipcRenderer } = require('electron');
 const { cleanPrice, debounce } = require('../utils');
 const { tradeInCart, tradeOutCart } = require('../cart');
 
-// Fetch inventory data from main process for Trade-Out
+// Fetch inventory data (unchanged)
 function fetchInventory(page, searchTerm) {
   ipcRenderer.send('get-inventory', { page, limit: 50, search: searchTerm });
   ipcRenderer.once('inventory-data', (event, { items, total }) => {
@@ -10,7 +10,7 @@ function fetchInventory(page, searchTerm) {
   });
 }
 
-// Render the Trade tab UI with Trade-In and Trade-Out sections
+// Render the Trade tab UI
 function render(page, searchTerm, inCart, outCart, inventory = null, total = null) {
   const content = document.getElementById('content');
   if (!inventory || total === null) {
@@ -45,11 +45,23 @@ function render(page, searchTerm, inCart, outCart, inventory = null, total = nul
             <input id="trade-in-tcg-card-name" placeholder="e.g., Charizard" type="text">
             <button id="fetch-trade-in-card">Fetch Card</button>
           </div>
+          <div class="input-group" id="trade-in-game-fetch" style="display: none;">
+            <label>Search Game</label>
+            <input id="trade-in-game-name" placeholder="e.g., FIFA 21" type="text">
+            <button id="fetch-trade-in-game-data">Fetch Game</button>
+          </div>
           <div id="tcg-modal-trade-in" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
             <div style="background: white; margin: 50px auto; padding: 20px; width: 80%; max-height: 80%; overflow-y: auto;">
               <h4>Select a Card</h4>
               <div id="tcg-card-list-trade-in" style="display: flex; flex-wrap: wrap; gap: 20px;"></div>
               <button id="close-tcg-modal-trade-in">Close</button>
+            </div>
+          </div>
+          <div id="game-modal-trade-in" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
+            <div style="background: white; margin: 50px auto; padding: 20px; width: 80%; max-height: 80%; overflow-y: auto;">
+              <h4>Select a Game</h4>
+              <div id="game-list-trade-in" style="display: flex; flex-wrap: wrap; gap: 20px;"></div>
+              <button id="close-game-modal-trade-in">Close</button>
             </div>
           </div>
           <div class="input-group">
@@ -67,7 +79,7 @@ function render(page, searchTerm, inCart, outCart, inventory = null, total = nul
           <div class="input-group">
             <label>Condition</label>
             <select id="trade-in-condition-category"></select>
-            <input id="trade-in-condition-value" placeholder="e.g., 9, scratches" type="text">
+            <input id="trade-in-condition-value" placeholder="e.g., scratches" type="text">
           </div>
           <div class="input-group">
             <label>Image</label>
@@ -94,7 +106,7 @@ function render(page, searchTerm, inCart, outCart, inventory = null, total = nul
       <div class="trade-section trade-out">
         <div class="section">
           <h3>Trade-Out Inventory</h3>
-          <input id="trade-out-search" type="text" placeholder="Search inventory (e.g., Charizard, Base Set)" value="${searchTerm}">
+          <input id="trade-out-search" type="text" placeholder="Search inventory" value="${searchTerm}">
           <ul id="trade-out-inventory-list">
             ${inventory.map(item => `
               <li>
@@ -132,7 +144,6 @@ function render(page, searchTerm, inCart, outCart, inventory = null, total = nul
     </div>
   `;
 
-  // Add event listeners after DOM render
   const typeSelector = document.getElementById('trade-in-type-selector');
   typeSelector.addEventListener('change', () => {
     console.log('Type changed to:', typeSelector.value);
@@ -147,12 +158,12 @@ function render(page, searchTerm, inCart, outCart, inventory = null, total = nul
   }, 600));
   document.getElementById('fetch-trade-in-card')?.addEventListener('click', () => fetchTcgCard('trade-in'));
   document.getElementById('close-tcg-modal-trade-in')?.addEventListener('click', () => closeTcgModal('trade-in'));
+  document.getElementById('fetch-trade-in-game-data')?.addEventListener('click', fetchTradeInGameData);
+  document.getElementById('close-game-modal-trade-in')?.addEventListener('click', () => closeGameModal('trade-in'));
   document.getElementById('add-to-trade-in').addEventListener('click', addToTradeInCart);
   document.getElementById('complete-trade').addEventListener('click', completeTradeTransaction);
   document.getElementById('clear-trade-in-cart').addEventListener('click', clearTradeInCart);
   document.getElementById('clear-trade-out-cart').addEventListener('click', clearTradeOutCart);
-  document.getElementById('trade-out-prev-page').addEventListener('click', () => fetchInventory(page - 1, searchTerm));
-  document.getElementById('trade-out-next-page').addEventListener('click', () => fetchInventory(page + 1, searchTerm));
   document.querySelectorAll('.add-to-trade-out').forEach(button => {
     button.addEventListener('click', () => {
       const { id, name, price, image, set, condition } = button.dataset;
@@ -162,29 +173,47 @@ function render(page, searchTerm, inCart, outCart, inventory = null, total = nul
   document.querySelectorAll('.trade-out-price-input').forEach(input => {
     input.addEventListener('change', (e) => updateTradeOutPrice(input.dataset.id, e.target.value));
   });
+
+  ipcRenderer.on('game-data', (event, games) => {
+    const gameList = document.getElementById('game-list-trade-in');
+    gameList.innerHTML = '';
+    games.forEach((game, index) => {
+      const gameDiv = document.createElement('div');
+      gameDiv.style = 'border: 1px solid #ccc; padding: 10px; width: 200px; text-align: center;';
+      gameDiv.innerHTML = `
+        ${game.image_url ? `<img src="${game.image_url}" alt="${game.name}" style="width: auto; height: auto; max-width: 180px; max-height: 250px;">` : 'No Image'}
+        <p><strong>${game.name}</strong></p>
+        <p>Platform: ${game.platform || 'Unknown'}</p>
+        <p>Release: ${game.release_date || 'N/A'}</p>
+        <p>Genres: ${game.genres || 'N/A'}</p>
+        <button class="select-game" data-index="${index}">Select</button>
+      `;
+      gameList.appendChild(gameDiv);
+    });
+    document.getElementById('game-modal-trade-in').style.display = 'flex';
+
+    document.querySelectorAll('#game-list-trade-in .select-game').forEach(button => {
+      button.addEventListener('click', () => {
+        const index = parseInt(button.dataset.index);
+        selectGame(games[index], 'trade-in');
+      });
+    });
+  });
+  ipcRenderer.on('game-data-error', (event, error) => console.error('Game data fetch error:', error));
 }
 
-// Fetch TCG card data from API or DB for Trade-In selection (Pokémon TCG only for now)
+// Fetch TCG card data (unchanged)
 function fetchTcgCard(context) {
   const input = document.getElementById(`${context}-tcg-card-name`);
-  if (!input) {
-    console.error(`No input found for context: ${context}`);
-    return;
-  }
+  if (!input) return console.error(`No input found for context: ${context}`);
   const cardName = input.value;
-  if (!cardName) {
-    console.error('No card name provided for', context);
-    return;
-  }
+  if (!cardName) return console.error('No card name provided for', context);
   console.log(`Fetching TCG card for ${context}:`, cardName);
   ipcRenderer.send('get-tcg-card', cardName);
   ipcRenderer.once('tcg-card-data', (event, cards) => {
     console.log(`Received TCG card data for ${context}:`, cards);
     const cardList = document.getElementById(`tcg-card-list-${context}`);
-    if (!cardList) {
-      console.error(`No card list found for context: ${context}`);
-      return;
-    }
+    if (!cardList) return console.error(`No card list found for context: ${context}`);
     cardList.innerHTML = '';
     cards.forEach((card, index) => {
       const cardDiv = document.createElement('div');
@@ -212,7 +241,7 @@ function fetchTcgCard(context) {
   ipcRenderer.once('tcg-card-error', (event, error) => console.error(`TCG card fetch failed for ${context}:`, error));
 }
 
-// Populate Trade-In form with selected TCG card data
+// Select TCG card (unchanged)
 function selectTcgCard(card, context) {
   console.log(`Selected TCG card for ${context}:`, card);
   const prefix = context;
@@ -242,12 +271,57 @@ function selectTcgCard(card, context) {
   closeTcgModal(context);
 }
 
-// Hide the TCG card selection modal
+// Fetch game data for Trade-In
+function fetchTradeInGameData() {
+  const type = document.getElementById('trade-in-type-selector').value;
+  if (type !== 'video_game') return;
+  const name = document.getElementById('trade-in-game-name').value || document.getElementById('trade-in-name').value;
+  const platform = document.getElementById('trade-in-platform').value;
+  if (!name || !platform) {
+    console.error('Name and platform required for video game fetch');
+    return;
+  }
+  console.log('Fetching game data for:', name, platform);
+  ipcRenderer.send('get-game-data', { name, platform });
+}
+
+// Select game for Trade-In
+function selectGame(game, context) {
+  console.log(`Selected game for ${context}:`, game);
+  const prefix = context;
+  document.getElementById(`${prefix}-type-selector`).value = 'video_game';
+  updateAttributeFields(context);
+  updateConditionOptions(context);
+  const nameField = document.getElementById(`${prefix}-name`);
+  const priceField = document.getElementById(`${prefix}-price`);
+  const tradeValueField = document.getElementById(`${prefix}-value`);
+  const conditionCategoryField = document.getElementById(`${prefix}-condition-category`);
+  const conditionValueField = document.getElementById(`${prefix}-condition-value`);
+  const imageUrlField = document.getElementById(`${prefix}-image-url`);
+  const platformField = document.getElementById(`${prefix}-platform`);
+
+  if (nameField) nameField.value = game.name;
+  if (priceField) priceField.value = game.price;
+  if (tradeValueField) tradeValueField.value = game.tradeValue;
+  if (conditionCategoryField) conditionCategoryField.value = '';
+  if (conditionValueField) conditionValueField.value = '';
+  if (imageUrlField) imageUrlField.value = game.image_url || '';
+  if (platformField) platformField.value = game.platform || '';
+  
+  closeGameModal(context);
+}
+
+// Hide TCG modal (unchanged)
 function closeTcgModal(context) {
   document.getElementById(`tcg-modal-${context}`).style.display = 'none';
 }
 
-// Add a manual item to the Trade-In cart (no inventory add yet)
+// Hide game modal
+function closeGameModal(context) {
+  document.getElementById(`game-modal-${context}`).style.display = 'none';
+}
+
+// Add item to Trade-In cart (unchanged)
 function addToTradeInCart() {
   const conditionCategory = document.getElementById('trade-in-condition-category').value;
   const conditionValue = document.getElementById('trade-in-condition-value').value;
@@ -287,14 +361,14 @@ function addToTradeInCart() {
   render(tradeOutPage, tradeOutSearchTerm, tradeInCart, tradeOutCart);
 }
 
-// Add an item from inventory to the Trade-Out cart
+// Add to Trade-Out cart (unchanged)
 function addToTradeOutCart(id, name, price, image_url, card_set, condition) {
   console.log('Adding to trade-out cart:', { id, name, price, image_url, card_set, condition });
   tradeOutCart.push({ id, name, price, image_url: decodeURIComponent(image_url), card_set, condition, role: 'trade_out' });
   fetchInventory(tradeOutPage, tradeOutSearchTerm);
 }
 
-// Update the negotiated price for an item in the Trade-Out cart
+// Update Trade-Out price (unchanged)
 function updateTradeOutPrice(id, value) {
   const index = tradeOutCart.findIndex(item => item.id === id);
   if (index !== -1) {
@@ -304,7 +378,7 @@ function updateTradeOutPrice(id, value) {
   fetchInventory(tradeOutPage, tradeOutSearchTerm);
 }
 
-// Complete a Trade transaction, add Trade-In items to inventory, and clear both carts
+// Complete Trade transaction (unchanged)
 function completeTradeTransaction() {
   console.log('Completing trade transaction:', { tradeInCart, tradeOutCart });
   const items = [...tradeInCart, ...tradeOutCart];
@@ -326,28 +400,27 @@ function completeTradeTransaction() {
   ipcRenderer.once('transaction-error', (event, error) => console.error('Trade transaction failed:', error));
 }
 
-// Clear the Trade-In cart and refresh the tab
+// Clear Trade-In cart (unchanged)
 function clearTradeInCart() {
   tradeInCart.length = 0;
   fetchInventory(tradeOutPage, tradeOutSearchTerm);
 }
 
-// Clear the Trade-Out cart and refresh the tab
+// Clear Trade-Out cart (unchanged)
 function clearTradeOutCart() {
   tradeOutCart.length = 0;
   fetchInventory(tradeOutPage, tradeOutSearchTerm);
 }
 
-// Update attribute fields based on selected type
+// Update attribute fields (unchanged)
 function updateAttributeFields(context) {
   const type = document.getElementById(`${context}-type-selector`).value;
   const attributesDiv = document.getElementById(`${context}-attributes`);
   const tcgFetchDiv = document.getElementById(`${context}-tcg-fetch`);
+  const gameFetchDiv = document.getElementById(`${context}-game-fetch`);
   attributesDiv.innerHTML = '';
-  if (tcgFetchDiv) {
-    console.log('Updating TCG fetch visibility for', type);
-    tcgFetchDiv.style.display = (type === 'pokemon_tcg' || type === 'other_tcg') ? 'block' : 'none';
-  }
+  if (tcgFetchDiv) tcgFetchDiv.style.display = (type === 'pokemon_tcg' || type === 'other_tcg') ? 'block' : 'none';
+  if (gameFetchDiv) gameFetchDiv.style.display = (type === 'video_game') ? 'block' : 'none';
 
   if (type === 'pokemon_tcg' || type === 'other_tcg') {
     attributesDiv.innerHTML = `
@@ -398,7 +471,7 @@ function updateAttributeFields(context) {
   }
 }
 
-// Update condition options based on selected type
+// Update condition options (unchanged)
 function updateConditionOptions(context) {
   const type = document.getElementById(`${context}-type-selector`).value;
   const conditionSelect = document.getElementById(`${context}-condition-category`);

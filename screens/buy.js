@@ -25,11 +25,23 @@ function render(cart) {
         <input id="buy-tcg-card-name" placeholder="e.g., Charizard" type="text">
         <button id="fetch-buy-card">Fetch Card</button>
       </div>
+      <div class="input-group" id="buy-game-fetch" style="display: none;">
+        <label>Search Game</label>
+        <input id="buy-game-name" placeholder="e.g., FIFA 21" type="text">
+        <button id="fetch-game-data">Fetch Game</button>
+      </div>
       <div id="tcg-modal-buy" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
         <div style="background: white; margin: 50px auto; padding: 20px; width: 80%; max-height: 80%; overflow-y: auto;">
           <h4>Select a Card</h4>
           <div id="tcg-card-list-buy" style="display: flex; flex-wrap: wrap; gap: 20px;"></div>
           <button id="close-tcg-modal-buy">Close</button>
+        </div>
+      </div>
+      <div id="game-modal-buy" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
+        <div style="background: white; margin: 50px auto; padding: 20px; width: 80%; max-height: 80%; overflow-y: auto;">
+          <h4>Select a Game</h4>
+          <div id="game-list-buy" style="display: flex; flex-wrap: wrap; gap: 20px;"></div>
+          <button id="close-game-modal-buy">Close</button>
         </div>
       </div>
       <div class="input-group">
@@ -47,7 +59,7 @@ function render(cart) {
       <div class="input-group">
         <label>Condition</label>
         <select id="buy-condition-category"></select>
-        <input id="buy-condition-value" placeholder="e.g., 9, scratches" type="text">
+        <input id="buy-condition-value" placeholder="e.g., scratches" type="text">
       </div>
       <div class="input-group">
         <label>Image</label>
@@ -73,7 +85,6 @@ function render(cart) {
     </div>
   `;
 
-  // Add event listeners after DOM render
   const typeSelector = document.getElementById('buy-type-selector');
   typeSelector.addEventListener('change', () => {
     console.log('Type changed to:', typeSelector.value);
@@ -85,32 +96,52 @@ function render(cart) {
 
   document.getElementById('fetch-buy-card')?.addEventListener('click', () => fetchTcgCard('buy'));
   document.getElementById('close-tcg-modal-buy')?.addEventListener('click', () => closeTcgModal('buy'));
+  document.getElementById('fetch-game-data')?.addEventListener('click', fetchGameData);
+  document.getElementById('close-game-modal-buy')?.addEventListener('click', () => closeGameModal('buy'));
   document.getElementById('add-to-buy').addEventListener('click', addToBuy);
   document.getElementById('complete-buy').addEventListener('click', completeBuyTransaction);
   document.getElementById('clear-buy-cart').addEventListener('click', clearBuyCart);
+
+  ipcRenderer.on('game-data', (event, games) => {
+    const gameList = document.getElementById('game-list-buy');
+    gameList.innerHTML = '';
+    games.forEach((game, index) => {
+      const gameDiv = document.createElement('div');
+      gameDiv.style = 'border: 1px solid #ccc; padding: 10px; width: 200px; text-align: center;';
+      gameDiv.innerHTML = `
+        ${game.image_url ? `<img src="${game.image_url}" alt="${game.name}" style="width: auto; height: auto; max-width: 180px; max-height: 250px;">` : 'No Image'}
+        <p><strong>${game.name}</strong></p>
+        <p>Platform: ${game.platform || 'Unknown'}</p>
+        <p>Release: ${game.release_date || 'N/A'}</p>
+        <p>Genres: ${game.genres || 'N/A'}</p>
+        <button class="select-game" data-index="${index}">Select</button>
+      `;
+      gameList.appendChild(gameDiv);
+    });
+    document.getElementById('game-modal-buy').style.display = 'flex';
+
+    document.querySelectorAll('#game-list-buy .select-game').forEach(button => {
+      button.addEventListener('click', () => {
+        const index = parseInt(button.dataset.index);
+        selectGame(games[index], 'buy');
+      });
+    });
+  });
+  ipcRenderer.on('game-data-error', (event, error) => console.error('Game data fetch error:', error));
 }
 
-// Fetch TCG card data from API or DB for Buy selection (Pokémon TCG only for now)
+// Fetch TCG card data (unchanged)
 function fetchTcgCard(context) {
   const input = document.getElementById(`${context}-tcg-card-name`);
-  if (!input) {
-    console.error(`No input found for context: ${context}`);
-    return;
-  }
+  if (!input) return console.error(`No input found for context: ${context}`);
   const cardName = input.value;
-  if (!cardName) {
-    console.error('No card name provided for', context);
-    return;
-  }
+  if (!cardName) return console.error('No card name provided for', context);
   console.log(`Fetching TCG card for ${context}:`, cardName);
   ipcRenderer.send('get-tcg-card', cardName);
   ipcRenderer.once('tcg-card-data', (event, cards) => {
     console.log(`Received TCG card data for ${context}:`, cards);
     const cardList = document.getElementById(`tcg-card-list-${context}`);
-    if (!cardList) {
-      console.error(`No card list found for context: ${context}`);
-      return;
-    }
+    if (!cardList) return console.error(`No card list found for context: ${context}`);
     cardList.innerHTML = '';
     cards.forEach((card, index) => {
       const cardDiv = document.createElement('div');
@@ -138,7 +169,7 @@ function fetchTcgCard(context) {
   ipcRenderer.once('tcg-card-error', (event, error) => console.error(`TCG card fetch failed for ${context}:`, error));
 }
 
-// Populate Buy form with selected TCG card data
+// Select TCG card (unchanged)
 function selectTcgCard(card, context) {
   console.log(`Selected TCG card for ${context}:`, card);
   const prefix = context;
@@ -168,12 +199,57 @@ function selectTcgCard(card, context) {
   closeTcgModal(context);
 }
 
-// Hide the TCG card selection modal
+// Fetch game data from Giant Bomb
+function fetchGameData() {
+  const type = document.getElementById('buy-type-selector').value;
+  if (type !== 'video_game') return;
+  const name = document.getElementById('buy-game-name').value || document.getElementById('buy-name').value;
+  const platform = document.getElementById('buy-platform').value;
+  if (!name || !platform) {
+    console.error('Name and platform required for video game fetch');
+    return;
+  }
+  console.log('Fetching game data for:', name, platform);
+  ipcRenderer.send('get-game-data', { name, platform });
+}
+
+// Select game from Giant Bomb data
+function selectGame(game, context) {
+  console.log(`Selected game for ${context}:`, game);
+  const prefix = context;
+  document.getElementById(`${prefix}-type-selector`).value = 'video_game';
+  updateAttributeFields(context);
+  updateConditionOptions(context);
+  const nameField = document.getElementById(`${prefix}-name`);
+  const priceField = document.getElementById(`${prefix}-price`);
+  const tradeValueField = document.getElementById(`${prefix}-trade-value`);
+  const conditionCategoryField = document.getElementById(`${prefix}-condition-category`);
+  const conditionValueField = document.getElementById(`${prefix}-condition-value`);
+  const imageUrlField = document.getElementById(`${prefix}-image-url`);
+  const platformField = document.getElementById(`${prefix}-platform`);
+
+  if (nameField) nameField.value = game.name;
+  if (priceField) priceField.value = game.price; // 0, user can adjust
+  if (tradeValueField) tradeValueField.value = game.tradeValue; // 0, user can adjust
+  if (conditionCategoryField) conditionCategoryField.value = '';
+  if (conditionValueField) conditionValueField.value = '';
+  if (imageUrlField) imageUrlField.value = game.image_url || '';
+  if (platformField) platformField.value = game.platform || '';
+  
+  closeGameModal(context);
+}
+
+// Hide TCG modal (unchanged)
 function closeTcgModal(context) {
   document.getElementById(`tcg-modal-${context}`).style.display = 'none';
 }
 
-// Add a manual item to the Buy cart (no inventory add yet)
+// Hide game modal
+function closeGameModal(context) {
+  document.getElementById(`game-modal-${context}`).style.display = 'none';
+}
+
+// Add item to Buy cart (unchanged)
 function addToBuy() {
   const conditionCategory = document.getElementById('buy-condition-category').value;
   const conditionValue = document.getElementById('buy-condition-value').value;
@@ -213,7 +289,7 @@ function addToBuy() {
   render(buyItems);
 }
 
-// Complete a Buy transaction, add items to inventory, and clear the cart
+// Complete Buy transaction (unchanged)
 function completeBuyTransaction() {
   console.log('Completing buy transaction:', { buyItems });
   const items = buyItems.slice();
@@ -234,22 +310,21 @@ function completeBuyTransaction() {
   ipcRenderer.once('transaction-error', (event, error) => console.error('Buy transaction failed:', error));
 }
 
-// Clear the Buy cart and refresh the tab
+// Clear Buy cart (unchanged)
 function clearBuyCart() {
   buyItems.length = 0;
   require('../renderer').showScreen('buy');
 }
 
-// Update attribute fields based on selected type
+// Update attribute fields (unchanged)
 function updateAttributeFields(context) {
   const type = document.getElementById(`${context}-type-selector`).value;
   const attributesDiv = document.getElementById(`${context}-attributes`);
   const tcgFetchDiv = document.getElementById(`${context}-tcg-fetch`);
+  const gameFetchDiv = document.getElementById(`${context}-game-fetch`);
   attributesDiv.innerHTML = '';
-  if (tcgFetchDiv) {
-    console.log('Updating TCG fetch visibility for', type);
-    tcgFetchDiv.style.display = (type === 'pokemon_tcg' || type === 'other_tcg') ? 'block' : 'none';
-  }
+  if (tcgFetchDiv) tcgFetchDiv.style.display = (type === 'pokemon_tcg' || type === 'other_tcg') ? 'block' : 'none';
+  if (gameFetchDiv) gameFetchDiv.style.display = (type === 'video_game') ? 'block' : 'none';
 
   if (type === 'pokemon_tcg' || type === 'other_tcg') {
     attributesDiv.innerHTML = `
@@ -300,7 +375,7 @@ function updateAttributeFields(context) {
   }
 }
 
-// Update condition options based on selected type
+// Update condition options (unchanged)
 function updateConditionOptions(context) {
   const type = document.getElementById(`${context}-type-selector`).value;
   const conditionSelect = document.getElementById(`${context}-condition-category`);
