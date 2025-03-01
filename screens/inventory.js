@@ -24,7 +24,7 @@ function render() {
           <h3>Inventory</h3>
           <div class="input-group">
             <label>Filter Inventory</label>
-            <input id="inventory-search" type="text" placeholder="Search by Name or Attributes" value="${searchTerm}">
+            <input id="inventory-search" type="text" placeholder="Search by Name, Type, Condition, or Attributes" value="${searchTerm}">
           </div>
           <table class="inventory-table">
             <thead>
@@ -106,7 +106,6 @@ function render() {
         }
       });
 
-      // Bind edit/save events
       document.querySelectorAll('.edit-item').forEach(button => {
         button.addEventListener('click', () => {
           const id = button.dataset.id;
@@ -162,6 +161,7 @@ function render() {
         filtered = filtered.filter(item => 
           item.name.toLowerCase().includes(searchTerm) || 
           item.type.toLowerCase().includes(searchTerm) ||
+          (item.condition || '').toLowerCase().includes(searchTerm) ||
           Object.values(item.attributes || {}).some(value => value.toLowerCase().includes(searchTerm))
         );
       }

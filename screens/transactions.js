@@ -65,7 +65,7 @@ function render() {
           <h3>Transactions</h3>
           <div class="input-group">
             <label>Filter Transactions</label>
-            <input id="transactions-search" type="text" placeholder="Search by ID, Type, or Item Name" value="${searchTerm}">
+            <input id="transactions-search" type="text" placeholder="Search by ID, Type, Item Name, or Condition" value="${searchTerm}">
           </div>
           <div class="input-group">
             <label>Start Date</label>
@@ -206,10 +206,12 @@ function render() {
         if (searchTerm) {
           filtered = filtered.filter(([id, tx]) => {
             const itemNames = tx.items.map(item => item.name.toLowerCase()).join(' ');
+            const itemConditions = tx.items.map(item => (item.condition || '').toLowerCase()).join(' ');
             return (
               id.toLowerCase().includes(searchTerm) ||
               (tx.type || '').toLowerCase().includes(searchTerm) ||
-              itemNames.includes(searchTerm)
+              itemNames.includes(searchTerm) ||
+              itemConditions.includes(searchTerm)
             );
           });
         }
