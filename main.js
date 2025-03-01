@@ -13,20 +13,32 @@ const db = new sqlite3.Database(dbPath, (err) => {
   }
 });
 
+// Cache for exchange rates
+let cachedExchangeRates = { USD_TO_GBP: 0.79, EUR_TO_GBP: 0.85 }; // Fallback defaults
+let lastFetched = 0;
+const CACHE_DURATION = 60 * 60 * 1000; // 1 hour in milliseconds
 
 // Fetch exchange rates from ExchangeRate-API
 async function getExchangeRates() {
+  const now = Date.now();
+  if (now - lastFetched < CACHE_DURATION) {
+    console.log('Using cached exchange rates:', cachedExchangeRates);
+    return cachedExchangeRates; // Return cached rates if not expired
+  }
+
   try {
     const response = await axios.get('https://v6.exchangerate-api.com/v6/' + process.env.EXCHANGERATE_API_KEY + '/latest/GBP');
     const rates = response.data.conversion_rates;
-    console.log('Fetched exchange rates:', rates); // Debug
-    return {
-      USD_TO_GBP: 1 / rates.USD, // Invert: £1 = X USD → $1 = 1/X GBP
-      EUR_TO_GBP: 1 / rates.EUR  // Invert: £1 = X EUR → €1 = 1/X GBP
+    console.log('Fetched fresh exchange rates:', rates);
+    cachedExchangeRates = {
+      USD_TO_GBP: 1 / rates.USD, // Invert for USD → GBP
+      EUR_TO_GBP: 1 / rates.EUR  // Invert for EUR → GBP
     };
+    lastFetched = now;
+    return cachedExchangeRates;
   } catch (err) {
     console.error('Exchange rate fetch error:', err.message);
-    return { USD_TO_GBP: 0.79, EUR_TO_GBP: 0.85 }; // Fallback
+    return cachedExchangeRates; // Return cached (or fallback) on error
   }
 }
 
