@@ -560,13 +560,12 @@ ipcMain.on('get-game-data', async (event, { name, platform }) => {
   }
 });
 
-// New handler for generating receipts
 ipcMain.on('generate-receipt', (event, transaction) => {
-  const { id, type, cash_in, cash_out, completed, items } = transaction;
+  const { id, type, cash_in, cash_out, completed, items } = transaction;  // Use completed, not timestamp
   const receiptDir = path.join(__dirname, 'receipts');
   fs.mkdirSync(receiptDir, { recursive: true });
   const receiptFile = path.join(receiptDir, `${id}-receipt.txt`);
-  
+
   const cashDue = type === 'trade' ? Math.max(cash_in - cash_out, 0) : 0;
   const cashBack = type === 'trade' ? Math.max(cash_out - cash_in, 0) : 0;
   const receiptContent = `
@@ -576,17 +575,16 @@ ipcMain.on('generate-receipt', (event, transaction) => {
     Type: ${type}
     Date: ${new Date(completed).toLocaleString()}
     Items:
-    ${items.map(item => `  - ${item.name} (${item.type}) | Price: £${(item.price || 0).toFixed(2)} | Trade Value: £${(item.tradeValue || 0).toFixed(2)} | Condition: ${item.condition || 'Not Set'}`).join('\n')}
-    Cash In: £${cash_in.toFixed(2)}
-    Cash Out: £${cash_out.toFixed(2)}
+    ${items.map(item => `  - ${item.name} (${item.type}) | Trade Value: £${(item.trade_value || 0).toFixed(2)} | Condition: ${item.condition || 'Not Set'}`).join('\n')}
+    Price Paid by Customer: £${cash_in.toFixed(2)}
+    Price Paid by Store: £${cash_out.toFixed(2)}
     ${type === 'trade' ? `Cash Due: £${cashDue.toFixed(2)}\nCash Back: £${cashBack.toFixed(2)}` : ''}
     -----------------------
   `;
-  
+
   fs.writeFileSync(receiptFile, receiptContent.trim());
   console.log('Receipt generated:', receiptFile);
-  
-  // Open the receipt file for printing/viewing
+
   shell.openPath(receiptFile);
   event.reply('receipt-generated', receiptFile);
 });
