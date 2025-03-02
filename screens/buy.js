@@ -1,6 +1,9 @@
 const { ipcRenderer } = require('electron');
 const { cleanPrice } = require('../utils');
 const { buyItems } = require('../cart');
+const axios = require('axios'); // Add this
+const fs = require('fs'); // Add this
+const path = require('path'); // Add this
 
 let allTcgCards = [];
 let currentTcgPage = 1;
@@ -212,7 +215,7 @@ function fetchTcgCard(context) {
   ipcRenderer.send('get-tcg-card', cardName);
 }
 
-function selectTcgCard(card, context) {
+async function selectTcgCard(card, context) {
   console.log(`Selected TCG card for ${context}:`, card);
   const prefix = context;
   document.getElementById(`${prefix}-type-selector`).value = 'pokemon_tcg';
@@ -234,9 +237,29 @@ function selectTcgCard(card, context) {
   if (tradeValueField) tradeValueField.value = Math.floor(defaultPrice * 0.5);
   if (conditionCategoryField) conditionCategoryField.value = '';
   if (conditionValueField) conditionValueField.value = '';
+
+  // Cache image on selection
+  let finalImageUrl = card.image_url;
+  if (finalImageUrl) {
+    const cacheDir = path.join(__dirname, 'images');
+    const cacheFileName = `${card.id}.png`;
+    const cachePath = path.join(cacheDir, cacheFileName);
+
+    if (!fs.existsSync(cachePath)) {
+      try {
+        const imageResponse = await axios.get(finalImageUrl, { responseType: 'arraybuffer' });
+        fs.mkdirSync(cacheDir, { recursive: true });
+        fs.writeFileSync(cachePath, Buffer.from(imageResponse.data));
+        console.log('Image cached on selection:', cachePath);
+      } catch (err) {
+        console.error('Image cache error:', err.message);
+      }
+    }
+    finalImageUrl = `file://${cachePath}`;
+  }
   if (imageUrlField) {
-    imageUrlField.value = card.image_url || '';
-    console.log(`Set image_url for ${prefix}: ${card.image_url}`); // Debug
+    imageUrlField.value = finalImageUrl || '';
+    console.log(`Set image_url for ${prefix}: ${finalImageUrl}`);
   }
   if (tcgIdField) tcgIdField.value = card.tcg_id || '';
   if (cardSetField) cardSetField.value = card.card_set || '';

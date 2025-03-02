@@ -459,30 +459,14 @@ ipcMain.on('get-tcg-card', async (event, name) => {
 
     const exchangeRates = await getExchangeRates();
 
-    const filteredCards = await Promise.all(allCards.map(async (card) => {
+    const filteredCards = allCards.map(card => {
       const tcgPrices = card.tcgplayer?.prices || {};
       const cmPrices = card.cardmarket?.prices || {};
-      let imageUrl = card.images.large;
-
-      if (imageUrl) {
-        const cacheDir = path.join(__dirname, 'images');
-        const cacheFileName = `${card.id}.png`;
-        const cachePath = path.join(cacheDir, cacheFileName);
-
-        if (!fs.existsSync(cachePath)) {
-          const imageResponse = await axios.get(imageUrl, { responseType: 'arraybuffer' });
-          fs.mkdirSync(cacheDir, { recursive: true });
-          fs.writeFileSync(cachePath, Buffer.from(imageResponse.data));
-          console.log('Image cached:', cachePath);
-        }
-        imageUrl = `file://${cachePath}`;
-      }
-
       return {
         id: card.id,
         name: card.name,
         type: 'pokemon_tcg',
-        image_url: imageUrl,
+        image_url: card.images.large, // Return raw URL, no caching here
         tcg_id: card.id,
         card_set: card.set.name,
         rarity: card.rarity,
@@ -505,7 +489,7 @@ ipcMain.on('get-tcg-card', async (event, name) => {
           }
         }
       };
-    }));
+    });
 
     console.log('Fetched TCG card data:', filteredCards);
     event.reply('tcg-card-data', filteredCards);
