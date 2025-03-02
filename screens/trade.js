@@ -16,6 +16,13 @@ let allTcgCards = [];
 let currentTcgPage = 1;
 const itemsPerPage = 12;
 
+function fetchInventory(page, searchTerm) {
+  ipcRenderer.send('get-inventory', { page, limit: 50, search: searchTerm });
+  ipcRenderer.once('inventory-data', (event, { items, total }) => {
+    render(page, searchTerm, tradeInCart, tradeOutCart, items, total);
+  });
+}
+
 function render(page, searchTerm, inCart, outCart, inventory = null, total = null) {
   const content = document.getElementById('content');
   if (!inventory || total === null) {
@@ -71,7 +78,7 @@ function render(page, searchTerm, inCart, outCart, inventory = null, total = nul
             <label>Name</label>
             <input id="trade-in-name" placeholder="Enter item name" type="text">
           </div>
-          <div id="trade-in-attributes"></div> <!-- Attributes here -->
+          <div id="trade-in-attributes"></div>
           <div class="input-group">
             <label>Market Price (\u00A3)</label>
             <input id="trade-in-price" placeholder="Enter price" type="number">
@@ -92,9 +99,58 @@ function render(page, searchTerm, inCart, outCart, inventory = null, total = nul
           <input id="trade-in-image-url" type="hidden">
           <button id="add-to-trade-in">Add Trade-In</button>
         </div>
-        <!-- Trade-In Cart unchanged -->
+        <div class="section">
+          <h3>Trade-In Cart</h3>
+          <ul id="trade-in-items">
+            ${inCart.map(item => `
+              <li>
+                ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}" style="max-width: 50px;">` : ''}
+                ${item.name} (${item.type}) - ${cleanPrice(item.tradeValue)} (${item.condition || 'Not Set'})
+              </li>
+            `).join('')}
+          </ul>
+          <p>Total Trade-In Value: ${cleanPrice(tradeInTotal.toFixed(2))}, Items: ${inCart.length}</p>
+          <button id="clear-trade-in-cart">Clear Cart</button>
+        </div>
       </div>
-      <!-- Trade-Out section unchanged -->
+      <div class="trade-section trade-out">
+        <div class="section">
+          <h3>Trade-Out Inventory</h3>
+          <input id="trade-out-search" type="text" placeholder="Search inventory" value="${searchTerm}">
+          <ul id="trade-out-inventory-list">
+            ${inventory.map(item => `
+              <li>
+                ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}">` : ''}
+                ${item.name} (${item.type}) - ${cleanPrice(item.price)} (${item.condition || 'Not Set'}) 
+                <button class="add-to-trade-out" data-id="${item.id}" data-name="${item.name}" data-price="${item.price}" data-image="${encodeURIComponent(item.image_url || '')}" data-set="${item.attributes.card_set || ''}" data-condition="${item.condition || ''}">Add</button>
+              </li>
+            `).join('')}
+          </ul>
+          <div>
+            <button id="trade-out-prev-page" ${page === 1 ? 'disabled' : ''}>Previous</button>
+            <span>Page ${page} of ${totalPages}</span>
+            <button id="trade-out-next-page" ${page >= totalPages ? 'disabled' : ''}>Next</button>
+          </div>
+        </div>
+        <div class="section">
+          <h3>Trade-Out Cart</h3>
+          <ul id="trade-out-items">
+            ${outCart.map(item => `
+              <li>
+                ${item.image_url ? `<img src="${decodeURIComponent(item.image_url)}" alt="${item.name}" style="max-width: 50px;">` : 'No Image'}
+                ${item.name} (${item.type}) - 
+                <input type="number" value="${item.negotiatedPrice || item.price}" class="trade-out-price-input" data-id="${item.id}" style="width: 60px;">
+                (Original: ${cleanPrice(item.price)}, ${item.condition || 'Not Set'})
+              </li>
+            `).join('')}
+          </ul>
+          <p>Total Trade-Out Value: ${cleanPrice(tradeOutTotal.toFixed(2))}, Items: ${outCart.length}</p>
+          <p>Cash Due: ${cleanPrice(cashDue.toFixed(2))}</p>
+          ${cashBack > 0 ? `<p>Cash Back: ${cleanPrice(cashBack.toFixed(2))}</p>` : ''}
+          <button id="complete-trade">Complete Trade</button>
+          <button id="clear-trade-out-cart">Clear Cart</button>
+        </div>
+      </div>
     </div>
   `;
 
@@ -128,70 +184,12 @@ function render(page, searchTerm, inCart, outCart, inventory = null, total = nul
     input.addEventListener('change', (e) => updateTradeOutPrice(input.dataset.id, e.target.value));
   });
 
-  let allTcgCards = [];
-  let currentTcgPage = 1;
-  const itemsPerPage = 12;
-
   ipcRenderer.removeAllListeners('tcg-card-data');
   ipcRenderer.on('tcg-card-data', (event, cards) => {
     allTcgCards = cards;
     currentTcgPage = 1;
     renderTcgModal('trade-in');
   });
-
-  function renderTcgModal(context) {
-    const cardList = document.getElementById(`tcg-card-list-${context}`);
-    const totalPages = Math.ceil(allTcgCards.length / itemsPerPage);
-    const startIndex = (currentTcgPage - 1) * itemsPerPage;
-    const paginatedCards = allTcgCards.slice(startIndex, startIndex + itemsPerPage);
-  
-    cardList.innerHTML = '';
-    paginatedCards.forEach((card, index) => {
-      const cardDiv = document.createElement('div');
-      cardDiv.className = 'bg-secondary rounded-lg shadow p-4 hover:shadow-md transition';
-      const priceHtml = `
-        <p class="text-sm font-semibold text-gray-700">Prices:</p>
-        ${Object.entries(card.prices.tcgplayer).map(([rarity, prices]) => `
-          <p class="text-xs text-gray-600">${rarity}: $${prices.market.toFixed(2)} (£${prices.market_gbp.toFixed(2)})</p>
-        `).join('')}
-        <p class="text-xs text-gray-600">Cardmarket Avg: €${card.prices.cardmarket.average.toFixed(2)} (£${card.prices.cardmarket.average_gbp.toFixed(2)})</p>
-      `;
-      cardDiv.innerHTML = `
-        ${card.image_url ? `<img src="${card.image_url}" alt="${card.name}" class="w-full h-auto max-h-64 object-contain mb-2">` : '<p class="text-gray-500">No Image</p>'}
-        <p class="text-lg font-semibold text-gray-800">${card.name}</p>
-        <p class="text-sm text-gray-600">Set: ${card.card_set}</p>
-        <p class="text-sm text-gray-600">Rarity: ${card.rarity || 'N/A'}</p>
-        ${priceHtml}
-        <button class="select-tcg-card mt-2 w-full px-3 py-1 bg-accent text-white rounded hover:bg-green-600" data-index="${startIndex + index}">Select</button>
-      `;
-      cardList.appendChild(cardDiv);
-    });
-  
-    document.getElementById(`tcg-page-info-${context}`).textContent = `Page ${currentTcgPage} of ${totalPages}`;
-    document.getElementById(`tcg-prev-page-${context}`).disabled = currentTcgPage === 1;
-    document.getElementById(`tcg-next-page-${context}`).disabled = currentTcgPage === totalPages;
-  
-    document.getElementById(`tcg-prev-page-${context}`).onclick = () => {
-      if (currentTcgPage > 1) {
-        currentTcgPage--;
-        renderTcgModal(context);
-      }
-    };
-    document.getElementById(`tcg-next-page-${context}`).onclick = () => {
-      if (currentTcgPage < totalPages) {
-        currentTcgPage++;
-        renderTcgModal(context);
-      }
-    };
-  
-    document.getElementById(`tcg-modal-${context}`).classList.remove('hidden');
-    document.querySelectorAll(`#tcg-card-list-${context} .select-tcg-card`).forEach(button => {
-      button.addEventListener('click', () => {
-        const index = parseInt(button.dataset.index);
-        selectTcgCard(allTcgCards[index], context);
-      });
-    });
-  }
 
   ipcRenderer.removeAllListeners('game-data');
   ipcRenderer.on('game-data', (event, games) => {
