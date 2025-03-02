@@ -1,0 +1,11 @@
+Collectibles POS Receipt
+    -----------------------
+    Transaction ID: 1740948283176
+    Type: buy
+    Date: Invalid Date
+    Items:
+      - Professor Birch's Observations (pokemon_tcg) | Price: £0.00 | Trade Value: £0.00 | Condition: Raw NM
+    Cash In: £0.00
+    Cash Out: £3.00
+    
+    -----------------------

@@ -86,6 +86,7 @@ function render() {
                 <th data-sort="cash_out">Cash Out</th>
                 <th data-sort="timestamp">Timestamp</th>
                 <th>Items</th>
+                <th>Actions</th> <!-- New column for Print Receipt -->
               </tr>
             </thead>
             <tbody>
@@ -107,6 +108,9 @@ function render() {
                         </li>
                       `).join('')}
                     </ul>
+                  </td>
+                  <td>
+                    <button class="print-receipt" data-transaction-id="${id}">Print Receipt</button>
                   </td>
                 </tr>
               `).join('')}
@@ -201,6 +205,15 @@ function render() {
       }
       bindToggleEvents();
 
+      // Add Print Receipt button handlers
+      document.querySelectorAll('.print-receipt').forEach(button => {
+        button.addEventListener('click', () => {
+          const transactionId = button.dataset.transactionId;
+          const transaction = transactions[transactionId];
+          ipcRenderer.send('generate-receipt', transaction);
+        });
+      });
+
       function applyFilters() {
         let filtered = allTransactions;
         if (searchTerm) {
@@ -239,5 +252,9 @@ function render() {
     renderTransactions(sortedTransactions);
   });
 }
+
+ipcRenderer.on('receipt-generated', (event, filePath) => {
+  console.log('Receipt opened:', filePath);
+});
 
 module.exports = { render };

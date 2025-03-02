@@ -1,5 +1,5 @@
 require('dotenv').config();
-const { app, BrowserWindow, ipcMain, net } = require('electron');
+const { app, BrowserWindow, ipcMain, net, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const sqlite3 = require('sqlite3').verbose();
@@ -558,4 +558,35 @@ ipcMain.on('get-game-data', async (event, { name, platform }) => {
     console.error('Giant Bomb game fetch error:', err.message);
     event.reply('game-data-error', err.message);
   }
+});
+
+// New handler for generating receipts
+ipcMain.on('generate-receipt', (event, transaction) => {
+  const { id, type, cash_in, cash_out, completed, items } = transaction;
+  const receiptDir = path.join(__dirname, 'receipts');
+  fs.mkdirSync(receiptDir, { recursive: true });
+  const receiptFile = path.join(receiptDir, `${id}-receipt.txt`);
+  
+  const cashDue = type === 'trade' ? Math.max(cash_in - cash_out, 0) : 0;
+  const cashBack = type === 'trade' ? Math.max(cash_out - cash_in, 0) : 0;
+  const receiptContent = `
+    Collectibles POS Receipt
+    -----------------------
+    Transaction ID: ${id}
+    Type: ${type}
+    Date: ${new Date(completed).toLocaleString()}
+    Items:
+    ${items.map(item => `  - ${item.name} (${item.type}) | Price: £${(item.price || 0).toFixed(2)} | Trade Value: £${(item.tradeValue || 0).toFixed(2)} | Condition: ${item.condition || 'Not Set'}`).join('\n')}
+    Cash In: £${cash_in.toFixed(2)}
+    Cash Out: £${cash_out.toFixed(2)}
+    ${type === 'trade' ? `Cash Due: £${cashDue.toFixed(2)}\nCash Back: £${cashBack.toFixed(2)}` : ''}
+    -----------------------
+  `;
+  
+  fs.writeFileSync(receiptFile, receiptContent.trim());
+  console.log('Receipt generated:', receiptFile);
+  
+  // Open the receipt file for printing/viewing
+  shell.openPath(receiptFile);
+  event.reply('receipt-generated', receiptFile);
 });
