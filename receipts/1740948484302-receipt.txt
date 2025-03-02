@@ -2,7 +2,7 @@ Collectibles POS Receipt
     -----------------------
     Transaction ID: 1740948484302
     Type: buy
-    Date: Invalid Date
+    Date: 02/03/2025, 20:48:04
     Items:
       - Team Aqua's Great Ball (pokemon_tcg) | Trade Value: £0.50 | Condition: Raw NM
   - Blastoise (pokemon_tcg) | Trade Value: £8.00 | Condition: Raw NM

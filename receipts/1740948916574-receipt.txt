@@ -2,10 +2,10 @@ Collectibles POS Receipt
     -----------------------
     Transaction ID: 1740948916574
     Type: sell
-    Date: Invalid Date
+    Date: 02/03/2025, 20:55:16
     Items:
-       - Professor Birch's Observations (pokemon_tcg) | Trade Value: £0.00 | Condition: Raw NM
-  - Blastoise (pokemon_tcg) | Trade Value: £0.00 | Condition: Raw NM
+      - Professor Birch's Observations (pokemon_tcg) | Price: £7.00 | Condition: Raw NM
+  - Blastoise (pokemon_tcg) | Price: £17.68 | Condition: Raw NM
     Price Paid by Customer: £24.68
     Price Paid by Store: £0.00
     
