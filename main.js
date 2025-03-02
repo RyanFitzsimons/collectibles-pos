@@ -561,24 +561,42 @@ ipcMain.on('get-game-data', async (event, { name, platform }) => {
 });
 
 ipcMain.on('generate-receipt', (event, transaction) => {
-  const { id, type, cash_in, cash_out, completed, items } = transaction;  // Use completed, not timestamp
+  const { id, type, cash_in, cash_out, timestamp, items } = transaction;
   const receiptDir = path.join(__dirname, 'receipts');
   fs.mkdirSync(receiptDir, { recursive: true });
   const receiptFile = path.join(receiptDir, `${id}-receipt.txt`);
 
   const cashDue = type === 'trade' ? Math.max(cash_in - cash_out, 0) : 0;
   const cashBack = type === 'trade' ? Math.max(cash_out - cash_in, 0) : 0;
+
+  // Customize item lines based on transaction type
+  const itemLines = items.map(item => {
+    if (type === 'buy') {
+      return `  - ${item.name} (${item.type}) | Trade Value: £${(item.trade_value || 0).toFixed(2)} | Condition: ${item.condition || 'Not Set'}`;
+    } else if (type === 'sell') {
+      const price = item.negotiated_price || item.original_price || 0;
+      return `  - ${item.name} (${item.type}) | Price: £${price.toFixed(2)} | Condition: ${item.condition || 'Not Set'}`;
+    } else if (type === 'trade') {
+      if (item.role === 'trade_in') {
+        return `  - ${item.name} (${item.type}) | Trade Value: £${(item.trade_value || 0).toFixed(2)} | Condition: ${item.condition || 'Not Set'} (Trade-In)`;
+      } else if (item.role === 'trade_out') {
+        const price = item.negotiated_price || item.original_price || 0;
+        return `  - ${item.name} (${item.type}) | Price: £${price.toFixed(2)} | Condition: ${item.condition || 'Not Set'} (Trade-Out)`;
+      }
+    }
+  }).join('\n');
+
   const receiptContent = `
     Collectibles POS Receipt
     -----------------------
     Transaction ID: ${id}
     Type: ${type}
-    Date: ${new Date(completed).toLocaleString()}
+    Date: ${new Date(timestamp).toLocaleString()}
     Items:
-    ${items.map(item => `  - ${item.name} (${item.type}) | Trade Value: £${(item.trade_value || 0).toFixed(2)} | Condition: ${item.condition || 'Not Set'}`).join('\n')}
+    ${itemLines}
     Price Paid by Customer: £${cash_in.toFixed(2)}
     Price Paid by Store: £${cash_out.toFixed(2)}
-    ${type === 'trade' ? `Cash Due: £${cashDue.toFixed(2)}\nCash Back: £${cashBack.toFixed(2)}` : ''}
+    ${type === 'trade' ? `Cash Due To Store: £${cashDue.toFixed(2)}\nCash Back To Customer: £${cashBack.toFixed(2)}` : ''}
     -----------------------
   `;
 
