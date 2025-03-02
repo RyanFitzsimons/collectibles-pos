@@ -586,6 +586,11 @@ ipcMain.on('generate-receipt', (event, transaction) => {
     }
   }).join('\n');
 
+  // Debug timestamp and ensure valid date
+  console.log('Generating receipt for transaction:', { id, timestamp });
+  const date = timestamp ? new Date(timestamp) : new Date();  // Fallback to now if invalid
+  const formattedDate = date.toLocaleString();
+
   const receiptContent = `
     Collectibles POS Receipt
     -----------------------
