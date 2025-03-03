@@ -108,6 +108,7 @@ function render(page, searchTerm, inCart, outCart, inventory = null, total = nul
           </ul>
           <p>Total Trade-In Value: ${cleanPrice(tradeInTotal.toFixed(2))}, Items: ${inCart.length}</p>  
           <button id="clear-trade-in-cart">Clear Cart</button> 
+          <h3>Trade-In Cart <span class="cart-count">(${inCart.length})</span></h3>
         </div>
       </div>
       <div class="trade-section trade-out">
@@ -145,7 +146,8 @@ function render(page, searchTerm, inCart, outCart, inventory = null, total = nul
           <p>Cash Due: ${cleanPrice(cashDue.toFixed(2))}</p>  
           ${cashBack > 0 ? `<p>Cash Back: ${cleanPrice(cashBack.toFixed(2))}</p>` : ''} 
           <button id="complete-trade">Complete Trade</button>  
-          <button id="clear-trade-out-cart">Clear Cart</button>  
+          <button id="clear-trade-out-cart">Clear Cart</button>
+          <h3>Trade-Out Cart <span class="cart-count">(${outCart.length})</span></h3> 
         </div>
       </div>
     </div>

@@ -455,3 +455,13 @@ p {
 .reconciliations-table th {
   background-color: #2C2F33;  /* Dark gray for headers */
 }
+
+/* Cart Count Indicators */
+.cart-count {
+  font-size: 12px;
+  color: #BABDCA; /* Softer gray */
+  margin-left: 5px;
+  background-color: #40444B;
+  padding: 2px 6px;
+  border-radius: 10px;
+}
