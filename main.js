@@ -603,12 +603,12 @@ ipcMain.on('generate-receipt', (event, transaction) => {
     -----------------------
     Transaction ID: ${id}
     Type: ${type}
-    Date: ${new Date(timestamp).toLocaleString()}  // Uses raw timestamp for display
+    Date: ${new Date(timestamp).toLocaleString()} 
     Items:
     ${itemLines}
-    Price Paid by Customer: £${cash_in.toFixed(2)}  // Total cash customer paid
-    Price Paid by Store: £${cash_out.toFixed(2)}  // Total cash store paid
-    ${type === 'trade' ? `Cash Due To Store: £${cashDue.toFixed(2)}\nCash Back To Customer: £${cashBack.toFixed(2)}` : ''}  // Trade-specific cash details
+    Price Paid by Customer: £${cash_in.toFixed(2)} 
+    Price Paid by Store: £${cash_out.toFixed(2)} 
+    ${type === 'trade' ? `Cash Due To Store: £${cashDue.toFixed(2)}\nCash Back To Customer: £${cashBack.toFixed(2)}` : ''}
     -----------------------
   `;  // Constructs receipt text content
 
