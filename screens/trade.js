@@ -298,6 +298,62 @@ async function selectTcgCard(card, context) {
   closeTcgModal(context);  // Closes the modal after selection
 }
 
+// Renders the TCG card selection modal for trade-in
+function renderTcgModal(context) {
+  console.log(`Rendering TCG modal for ${context} with ${allTcgCards.length} cards`);  // Logs modal render
+  const startIndex = (currentTcgPage - 1) * itemsPerPage;  // Calculates start index for pagination
+  const paginatedCards = allTcgCards.slice(startIndex, startIndex + itemsPerPage);  // Slices cards for current page
+  const totalPages = Math.ceil(allTcgCards.length / itemsPerPage);  // Calculates total pages
+
+  const modal = document.getElementById(`tcg-modal-${context}`);  // Gets modal container
+  if (!modal) {
+    console.error(`Modal tcg-modal-${context} not found in DOM`);  // Errors if modal missing
+    return;
+  }
+  const cardList = document.getElementById(`tcg-card-list-${context}`);  // Gets card list container
+  cardList.innerHTML = '';  // Clears existing list
+  paginatedCards.forEach(card => {
+    const cardDiv = document.createElement('div');
+    cardDiv.style = 'border: 1px solid #ccc; padding: 10px; width: 200px; text-align: center;';  // Styles card
+    const price = card.prices.tcgplayer.holofoil?.market_gbp || card.prices.cardmarket.average_gbp || 0;  // Gets price in GBP
+    cardDiv.innerHTML = `
+      ${card.image_url ? `<img src="${card.image_url}" alt="${card.name}" style="width: auto; height: auto; max-width: 180px; max-height: 250px;">` : 'No Image'} 
+      <p><strong>${card.name}</strong></p>
+      <p>Set: ${card.card_set || 'Unknown'}</p>
+      <p>Rarity: ${card.rarity || 'N/A'}</p>
+      <p>Price: ${cleanPrice(price)}</p>
+      <button class="select-tcg-card" data-id="${card.id}">Select</button>
+    `;  // HTML for each card
+    cardList.appendChild(cardDiv);  // Adds card to list
+  });
+
+  document.getElementById(`tcg-page-info-${context}`).textContent = `Page ${currentTcgPage} of ${totalPages}`;  // Updates page info
+  document.getElementById(`tcg-prev-page-${context}`).disabled = currentTcgPage === 1;  // Disables prev button on first page
+  document.getElementById(`tcg-next-page-${context}`).disabled = currentTcgPage === totalPages;  // Disables next button on last page
+
+  document.getElementById(`tcg-prev-page-${context}`).onclick = () => {
+    if (currentTcgPage > 1) {
+      currentTcgPage--;  // Goes to previous page
+      renderTcgModal(context);  // Re-renders modal
+    }
+  };
+  document.getElementById(`tcg-next-page-${context}`).onclick = () => {
+    if (currentTcgPage < totalPages) {
+      currentTcgPage++;  // Goes to next page
+      renderTcgModal(context);  // Re-renders modal
+    }
+  };
+
+  document.querySelectorAll(`#tcg-card-list-${context} .select-tcg-card`).forEach(button => {
+    button.addEventListener('click', () => {
+      const card = allTcgCards.find(c => c.id === button.dataset.id);  // Finds selected card
+      selectTcgCard(card, context);  // Populates form with card data
+    });
+  });
+
+  modal.style.display = 'flex';  // Shows the modal
+}
+
 // Fetches game data from the main process for trade-in
 function fetchTradeInGameData() {
   const type = document.getElementById('trade-in-type-selector').value;  // Gets selected item type
