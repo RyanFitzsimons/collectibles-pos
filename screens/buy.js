@@ -89,6 +89,7 @@ function render(cart) {
       <p>Total Payout: ${cleanPrice(totalPayout.toFixed(2))}, Items: ${cart.length}</p>
       <button id="complete-buy">Complete Buy</button>
       <button id="clear-buy-cart">Clear Cart</button>
+      <h3>Buy Cart <span class="cart-count">(${cart.length})</span></h3>
     </div>
   `;  // Sets the HTML content for the Buy screen
 
