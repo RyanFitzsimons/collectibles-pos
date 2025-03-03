@@ -5,9 +5,11 @@ const { cleanPrice, debounce } = require('../utils');
 // Render the Transactions tab UI with transaction data
 function render() {
   const content = document.getElementById('content');
-  ipcRenderer.send('get-transactions');
+  ipcRenderer.send('get-transactions'); // Request all transactions from main process
+  // Handle incoming transaction data from main process
   ipcRenderer.once('transactions-data', (event, rows) => {
     const transactions = {};
+    // Group rows by transaction ID into a structured object
     rows.forEach(row => {
       const txId = row.transaction_id;
       if (!transactions[txId]) {
@@ -37,23 +39,26 @@ function render() {
       }
     });
 
+    // Convert transactions object to array for sorting and filtering
     let allTransactions = Object.entries(transactions);
-    let sortedTransactions = allTransactions.sort((a, b) => new Date(b[1].timestamp) - new Date(a[1].timestamp));
-    let currentSortKey = 'timestamp';
-    let isAsc = false;
-    let searchTerm = '';
-    let startDate = '';
-    let endDate = '';
-    let currentPage = 1;
-    const itemsPerPage = 10;
+    let sortedTransactions = allTransactions.sort((a, b) => new Date(b[1].timestamp) - new Date(a[1].timestamp)); // Default sort by timestamp descending
+    let currentSortKey = 'timestamp'; // Current column being sorted
+    let isAsc = false; // Sort direction (ascending or descending)
+    let searchTerm = ''; // Current search filter
+    let startDate = ''; // Start date filter
+    let endDate = ''; // End date filter
+    let currentPage = 1; // Current page for pagination
+    const itemsPerPage = 10; // Number of transactions per page
 
+    // Renders the transaction table with pagination and filters applied
     function renderTransactions(filteredTransactions) {
-      const totalCashIn = filteredTransactions.reduce((sum, [, tx]) => sum + (parseFloat(tx.cash_in) || 0), 0);
-      const totalCashOut = filteredTransactions.reduce((sum, [, tx]) => sum + (parseFloat(tx.cash_out) || 0), 0);
-      const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage);
-      const startIndex = (currentPage - 1) * itemsPerPage;
-      const paginatedTransactions = filteredTransactions.slice(startIndex, startIndex + itemsPerPage);
+      const totalCashIn = filteredTransactions.reduce((sum, [, tx]) => sum + (parseFloat(tx.cash_in) || 0), 0); // Total cash received
+      const totalCashOut = filteredTransactions.reduce((sum, [, tx]) => sum + (parseFloat(tx.cash_out) || 0), 0); // Total cash paid
+      const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage); // Total pages for pagination
+      const startIndex = (currentPage - 1) * itemsPerPage; // Start index for current page
+      const paginatedTransactions = filteredTransactions.slice(startIndex, startIndex + itemsPerPage); // Slice for current page
 
+      // Calculate transaction type statistics
       const stats = {
         total: filteredTransactions.length,
         sells: filteredTransactions.filter(([, tx]) => tx.type === 'sell').length,
@@ -125,6 +130,7 @@ function render() {
         </div>
       `;
 
+      // Add sort functionality to table headers
       const table = document.querySelector('.transactions-table');
       table.querySelectorAll('th[data-sort]').forEach(th => {
         th.addEventListener('click', () => {
@@ -144,31 +150,36 @@ function render() {
               ? (a[1][key] || 0) - (b[1][key] || 0) 
               : (b[1][key] || 0) - (a[1][key] || 0));
           }
-          th.classList.toggle('asc', isAsc);
+          th.classList.toggle('asc', isAsc); // Toggle sort direction indicator
           renderTransactions(sortedTransactions);
         });
       });
 
+      // Filter by search term with debounce to reduce re-renders
       document.getElementById('transactions-search').addEventListener('input', debounce((e) => {
         searchTerm = e.target.value.toLowerCase();
         applyFilters();
       }, 600));
 
+      // Filter by start date
       document.getElementById('transactions-start-date').addEventListener('change', (e) => {
         startDate = e.target.value;
         applyFilters();
       });
+      // Filter by end date
       document.getElementById('transactions-end-date').addEventListener('change', (e) => {
         endDate = e.target.value;
         applyFilters();
       });
 
+      // Pagination: Previous page
       document.getElementById('prev-page').addEventListener('click', () => {
         if (currentPage > 1) {
           currentPage--;
           renderTransactions(sortedTransactions);
         }
       });
+      // Pagination: Next page
       document.getElementById('next-page').addEventListener('click', () => {
         if (currentPage < totalPages) {
           currentPage++;
@@ -176,6 +187,7 @@ function render() {
         }
       });
 
+      // Export table to CSV
       document.getElementById('export-csv').addEventListener('click', () => {
         let csvContent = 'ID,Type,Cash In,Cash Out,Timestamp,Items\n';
         filteredTransactions.forEach(([id, tx]) => {
@@ -193,6 +205,7 @@ function render() {
         window.URL.revokeObjectURL(url);
       });
 
+      // Bind toggle events for showing/hiding item details
       function bindToggleEvents() {
         document.querySelectorAll('.toggle-items').forEach(button => {
           button.addEventListener('click', () => {
@@ -206,15 +219,16 @@ function render() {
       }
       bindToggleEvents();
 
-      // Add Print Receipt button handlers
+      // Bind print receipt button events
       document.querySelectorAll('.print-receipt').forEach(button => {
         button.addEventListener('click', () => {
           const transactionId = button.dataset.transactionId;
           const transaction = transactions[transactionId];
-          ipcRenderer.send('generate-receipt', transaction);
+          ipcRenderer.send('generate-receipt', transaction); // Send print request to main process
         });
       });
 
+      // Apply search and date filters to transaction list
       function applyFilters() {
         let filtered = allTransactions;
         if (searchTerm) {
@@ -238,25 +252,26 @@ function render() {
         sortedTransactions = filtered.sort((a, b) => {
           const aVal = currentSortKey === 'timestamp' ? new Date(a[1][currentSortKey]) : (a[1][currentSortKey] || 0);
           const bVal = currentSortKey === 'timestamp' ? new Date(b[1][currentSortKey]) : (b[1][currentSortKey] || 0);
-          return isAsc ? aVal - bVal : bVal - aVal;
+          return isAsc ? aVal - bVal : bVal - aVal; // Sort based on current key and direction
         });
-        currentPage = 1;
+        currentPage = 1; // Reset to first page after filtering
         renderTransactions(sortedTransactions);
       }
 
+      // Formats item attributes for display
       function formatAttributes(attributes) {
         if (!attributes || Object.keys(attributes).length === 0) return '';
         return ' - ' + Object.entries(attributes).map(([key, value]) => `${key}: ${value}`).join(', ');
       }
     }
 
-    renderTransactions(sortedTransactions);
+    renderTransactions(sortedTransactions); // Initial render with all transactions
   });
 }
 
-// Generate receipt to txt file
+// Handle receipt generation confirmation from main process
 ipcRenderer.on('receipt-generated', (event, filePath) => {
-  console.log('Receipt opened:', filePath);
+  console.log('Receipt opened:', filePath); // Log when receipt is opened
 });
 
 module.exports = { render };

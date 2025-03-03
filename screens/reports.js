@@ -68,8 +68,9 @@ function render() {
     </div>
   `;
 
-  // Fetch and display reconciliations
-  ipcRenderer.send('get-reconciliations');
+  
+  ipcRenderer.send('get-reconciliations'); // Request all transaction data from main process
+  
   ipcRenderer.once('reconciliations-data', (event, rows) => {
     const tbody = document.getElementById('reconciliations-list');
     tbody.innerHTML = rows.map(row => `

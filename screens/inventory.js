@@ -5,6 +5,7 @@ const { cleanPrice, debounce } = require('../utils');
 // Render the Inventory tab UI with editable items and attributes
 function render() {
   const content = document.getElementById('content');
+  // Fetch inventory data for the current page
   ipcRenderer.send('get-all-inventory');
   ipcRenderer.once('all-inventory-data', (event, { items, total }) => {
     let allItems = items;

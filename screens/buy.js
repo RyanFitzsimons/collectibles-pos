@@ -2,16 +2,18 @@
 const { ipcRenderer } = require('electron');
 const { cleanPrice } = require('../utils');
 const { buyItems } = require('../cart');
-const axios = require('axios'); // Add this
-const fs = require('fs'); // Add this
-const path = require('path'); // Add this
+const axios = require('axios'); // Library for HTTP requests (e.g., image caching)
+const fs = require('fs'); // File system module for saving images
+const path = require('path'); // Path utilities for file operations
 
+// Array to store all TCG cards fetched for pagination
 let allTcgCards = [];
-let currentTcgPage = 1;
-const itemsPerPage = 12;
+let currentTcgPage = 1; // Current page of TCG cards in modal
+const itemsPerPage = 12; // Number of TCG cards per page in modal
 
+// Renders the Buy screen UI, including form and cart
 function render(cart) {
-  const totalPayout = cart.reduce((sum, item) => sum + item.tradeValue, 0);
+  const totalPayout = cart.reduce((sum, item) => sum + item.tradeValue, 0); // Calculate total trade value for cart
   const content = document.getElementById('content');
   content.innerHTML = `
     <div class="section">
@@ -90,6 +92,7 @@ function render(cart) {
     </div>
   `;
 
+  // Set up event listeners for UI interactions
   const typeSelector = document.getElementById('buy-type-selector');
   typeSelector.addEventListener('change', () => {
     console.log('Type changed to:', typeSelector.value);
@@ -118,6 +121,7 @@ function render(cart) {
     renderTcgModal('buy');
   });
 
+  // Handle game data from main process
   ipcRenderer.on('game-data', (event, games) => {
     const gameList = document.getElementById('game-list-buy');
     gameList.innerHTML = '';
@@ -147,6 +151,7 @@ function render(cart) {
   ipcRenderer.on('game-data-error', (event, error) => console.error('Game data fetch error:', error));
 }
 
+// Renders the TCG card selection modal with pagination
 function renderTcgModal(context) {
   console.log(`Rendering TCG modal for ${context}`);
   const modal = document.getElementById(`tcg-modal-${context}`);
@@ -159,7 +164,7 @@ function renderTcgModal(context) {
   const startIndex = (currentTcgPage - 1) * itemsPerPage;
   const paginatedCards = allTcgCards.slice(startIndex, startIndex + itemsPerPage);
 
-  cardList.innerHTML = '';
+  cardList.innerHTML = ''; // Clear existing cards
   paginatedCards.forEach((card, index) => {
     const cardDiv = document.createElement('div');
     cardDiv.style = 'border: 1px solid #ccc; padding: 10px; width: 220px; text-align: center;';
@@ -181,6 +186,7 @@ function renderTcgModal(context) {
     cardList.appendChild(cardDiv);
   });
 
+  // Update pagination controls
   document.getElementById(`tcg-page-info-${context}`).textContent = `Page ${currentTcgPage} of ${totalPages}`;
   document.getElementById(`tcg-prev-page-${context}`).disabled = currentTcgPage === 1;
   document.getElementById(`tcg-next-page-${context}`).disabled = currentTcgPage === totalPages;
@@ -207,6 +213,7 @@ function renderTcgModal(context) {
   });
 }
 
+// Fetches TCG card data from the main process based on user input
 function fetchTcgCard(context) {
   const input = document.getElementById(`${context}-tcg-card-name`);
   if (!input) return console.error(`No input found for context: ${context}`);
@@ -216,6 +223,7 @@ function fetchTcgCard(context) {
   ipcRenderer.send('get-tcg-card', cardName);
 }
 
+// Handles selection of a TCG card from the modal, caching its image
 async function selectTcgCard(card, context) {
   console.log(`Selected TCG card for ${context}:`, card);
   const prefix = context;
@@ -232,6 +240,7 @@ async function selectTcgCard(card, context) {
   const cardSetField = document.getElementById(`${prefix}-card_set`);
   const rarityField = document.getElementById(`${prefix}-rarity`);
 
+  // Populate form fields with card data
   if (nameField) nameField.value = card.name;
   const defaultPrice = card.prices.tcgplayer.holofoil?.market_gbp || card.prices.cardmarket.average_gbp || 0;
   if (priceField) priceField.value = defaultPrice;
@@ -239,7 +248,7 @@ async function selectTcgCard(card, context) {
   if (conditionCategoryField) conditionCategoryField.value = '';
   if (conditionValueField) conditionValueField.value = '';
 
-  // Cache image on selection
+  // Cache the card image locally if not already cached
   let finalImageUrl = card.image_url;
   if (finalImageUrl) {
     const cacheDir = path.join(__dirname, 'images');
@@ -266,9 +275,10 @@ async function selectTcgCard(card, context) {
   if (cardSetField) cardSetField.value = card.card_set || '';
   if (rarityField) rarityField.value = card.rarity || '';
   
-  closeTcgModal(context);
+  closeTcgModal(context); // Close modal after selection
 }
 
+// Fetches game data from the main process based on user input
 function fetchGameData() {
   const type = document.getElementById('buy-type-selector').value;
   if (type !== 'video_game') return;
@@ -279,6 +289,7 @@ function fetchGameData() {
   ipcRenderer.send('get-game-data', { name, platform });
 }
 
+// Handles selection of a game from the modal
 function selectGame(game, context) {
   console.log(`Selected game for ${context}:`, game);
   const prefix = context;
@@ -304,20 +315,25 @@ function selectGame(game, context) {
   closeGameModal(context);
 }
 
+// Closes the TCG card selection modal
 function closeTcgModal(context) {
   document.getElementById(`tcg-modal-${context}`).style.display = 'none';
 }
 
+// Closes the game selection modal
 function closeGameModal(context) {
   document.getElementById(`game-modal-${context}`).style.display = 'none';
 }
 
+// Adds an item to the buy cart from form inputs
 function addToBuy() {
   const conditionCategory = document.getElementById('buy-condition-category').value;
   const conditionValue = document.getElementById('buy-condition-value').value;
   const condition = conditionCategory ? `${conditionCategory}${conditionValue ? ' ' + conditionValue : ''}` : conditionValue;
   const type = document.getElementById('buy-type-selector').value;
   const attributes = {};
+
+  // Populate attributes based on item type
   if (type === 'pokemon_tcg' || type === 'other_tcg') {
     attributes.tcg_id = document.getElementById('buy-tcg_id')?.value || null;
     attributes.card_set = document.getElementById('buy-card_set')?.value || null;
@@ -340,7 +356,7 @@ function addToBuy() {
   console.log('Adding item with image_url:', imageUrl); // Debug
 
   const buyItem = {
-    id: Date.now().toString(),
+    id: Date.now().toString(), // Unique ID based on current time
     type,
     name: document.getElementById('buy-name').value,
     price: parseFloat(document.getElementById('buy-price').value) || 0,
@@ -348,38 +364,41 @@ function addToBuy() {
     condition: condition || null,
     image_url: imageUrl, // Ensure this is the cached file URL
     attributes,
-    role: 'trade_in'
+    role: 'trade_in' // Buy items are trade-ins from customer
   };
   buyItems.push(buyItem);
   console.log('Adding to buy cart:', buyItem);
-  render(buyItems);
+  render(buyItems); // Refresh UI with updated cart
 }
 
+// Completes the buy transaction, sending items to main process
 function completeBuyTransaction() {
   console.log('Completing buy transaction:', { buyItems });
   const items = buyItems.slice();
-  const cashIn = 0;
-  const cashOut = buyItems.reduce((sum, item) => sum + parseFloat(item.tradeValue), 0);
+  const cashIn = 0; // No cash received from customer for Buy
+  const cashOut = buyItems.reduce((sum, item) => sum + parseFloat(item.tradeValue), 0); // Total paid to customer
   
   items.forEach(item => {
     const itemData = { ...item, ...item.attributes };
-    ipcRenderer.send('add-item', itemData);
+    ipcRenderer.send('add-item', itemData); // Send each item to be added to inventory
   });
   
   ipcRenderer.send('complete-transaction', { items, type: 'buy', cashIn, cashOut });
   ipcRenderer.once('transaction-complete', (event, data) => {
     console.log('Buy transaction completed');
-    buyItems.length = 0;
-    require('../renderer').showScreen('buy');
+    buyItems.length = 0; // Clear cart
+    require('../renderer').showScreen('buy'); // Reload Buy screen
   });
   ipcRenderer.once('transaction-error', (event, error) => console.error('Buy transaction failed:', error));
 }
 
+// Clears the buy cart
 function clearBuyCart() {
   buyItems.length = 0;
-  require('../renderer').showScreen('buy');
+  require('../renderer').showScreen('buy'); // Refresh UI with empty cart
 }
 
+// Updates the attribute fields in the form based on selected item type
 function updateAttributeFields(context) {
   const type = document.getElementById(`${context}-type-selector`).value;
   const attributesDiv = document.getElementById(`${context}-attributes`);
@@ -389,6 +408,7 @@ function updateAttributeFields(context) {
   if (tcgFetchDiv) tcgFetchDiv.style.display = (type === 'pokemon_tcg' || type === 'other_tcg') ? 'block' : 'none';
   if (gameFetchDiv) gameFetchDiv.style.display = (type === 'video_game') ? 'block' : 'none';
 
+  // Add specific fields based on item type
   if (type === 'pokemon_tcg' || type === 'other_tcg') {
     attributesDiv.innerHTML = `
       <input id="${context}-tcg_id" type="hidden">
@@ -442,11 +462,13 @@ function updateAttributeFields(context) {
   }
 }
 
+// Updates condition options in the dropdown based on item type
 function updateConditionOptions(context) {
   const type = document.getElementById(`${context}-type-selector`).value;
   const conditionSelect = document.getElementById(`${context}-condition-category`);
   conditionSelect.innerHTML = '<option value="">Select Condition</option>';
 
+  // Add empty option as default prompt
   const options = {
     'pokemon_tcg': ['Raw', 'PSA', 'CGC', 'BGS', 'TAG', 'Other'],
     'other_tcg': ['Raw', 'PSA', 'CGC', 'BGS', 'TAG', 'Other'],
@@ -456,6 +478,7 @@ function updateConditionOptions(context) {
     'coin': ['Uncirculated', 'Circulated', 'Proof', 'Graded']
   }[type] || [];
 
+  // Populate condition options
   options.forEach(option => {
     const opt = document.createElement('option');
     opt.value = option;

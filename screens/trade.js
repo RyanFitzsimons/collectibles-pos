@@ -2,40 +2,36 @@
 const { ipcRenderer } = require('electron');
 const { cleanPrice, debounce } = require('../utils');
 const { tradeInCart, tradeOutCart } = require('../cart');
-const axios = require('axios');
-const fs = require('fs'); 
-const path = require('path'); 
+const axios = require('axios'); // Library for HTTP requests (e.g., image caching)
+const fs = require('fs');  // File system module for saving images
+const path = require('path'); // Path utilities for file operations
 
-function fetchInventory(page, searchTerm) {
-  ipcRenderer.send('get-inventory', { page, limit: 50, search: searchTerm });
-  ipcRenderer.once('inventory-data', (event, { items, total }) => {
-    render(page, searchTerm, tradeInCart, tradeOutCart, items, total);
-  });
-}
-
+// Tracks the current page and search term for trade-out inventory
 let allTcgCards = [];
 let currentTcgPage = 1;
 const itemsPerPage = 12;
 
+// Fetches inventory data from the main process for trade-out section
 function fetchInventory(page, searchTerm) {
-  ipcRenderer.send('get-inventory', { page, limit: 50, search: searchTerm });
+  ipcRenderer.send('get-inventory', { page, limit: 50, search: searchTerm }); // Request inventory data with pagination and search
   ipcRenderer.once('inventory-data', (event, { items, total }) => {
-    render(page, searchTerm, tradeInCart, tradeOutCart, items, total);
+    render(page, searchTerm, tradeInCart, tradeOutCart, items, total); // Render UI with fetched data
   });
 }
 
+// Renders the Trade screen UI, including trade-in form and trade-out inventory
 function render(page, searchTerm, inCart, outCart, inventory = null, total = null) {
   const content = document.getElementById('content');
   if (!inventory || total === null) {
-    fetchInventory(page, searchTerm);
+    fetchInventory(page, searchTerm); // Fetch inventory if not provided
     return;
   }
 
-  const tradeInTotal = inCart.reduce((sum, item) => sum + item.tradeValue, 0);
-  const tradeOutTotal = outCart.reduce((sum, item) => sum + (parseFloat(item.negotiatedPrice) || item.price), 0);
-  const cashDue = Math.max(tradeOutTotal - tradeInTotal, 0);
-  const cashBack = tradeInTotal > tradeOutTotal ? tradeInTotal - tradeOutTotal : 0;
-  const totalPages = Math.ceil(total / 50);
+  const tradeInTotal = inCart.reduce((sum, item) => sum + item.tradeValue, 0); // Total trade-in value (customer gives)
+  const tradeOutTotal = outCart.reduce((sum, item) => sum + (parseFloat(item.negotiatedPrice) || item.price), 0); // Total trade-out value (customer gets)
+  const cashDue = Math.max(tradeOutTotal - tradeInTotal, 0); // Cash customer owes if trade-out exceeds trade-in
+  const cashBack = tradeInTotal > tradeOutTotal ? tradeInTotal - tradeOutTotal : 0; // Cash store owes if trade-in exceeds trade-out
+  const totalPages = Math.ceil(total / 50); // Total pages for trade-out inventory pagination
 
   content.innerHTML = `
     <div class="trade-container">
@@ -155,18 +151,22 @@ function render(page, searchTerm, inCart, outCart, inventory = null, total = nul
     </div>
   `;
 
+  // Set up trade-in form event listeners
   const typeSelector = document.getElementById('trade-in-type-selector');
   typeSelector.addEventListener('change', () => {
     console.log('Type changed to:', typeSelector.value);
-    updateAttributeFields('trade-in');
+    updateAttributeFields('trade-in'); // Update form fields based on type
     updateConditionOptions('trade-in');
   });
   updateAttributeFields('trade-in');
   updateConditionOptions('trade-in');
 
+  // Search trade-out inventory with debounce to reduce fetch frequency
   document.getElementById('trade-out-search').addEventListener('input', debounce((e) => {
-    fetchInventory(1, e.target.value);
+    fetchInventory(1, e.target.value); // Fetch page 1 with new search term
   }, 600));
+
+  // Add event listeners for buttons
   document.getElementById('fetch-trade-in-card')?.addEventListener('click', () => fetchTcgCard('trade-in'));
   document.getElementById('close-tcg-modal-trade-in')?.addEventListener('click', () => closeTcgModal('trade-in'));
   document.getElementById('fetch-trade-in-game-data')?.addEventListener('click', fetchTradeInGameData);
@@ -175,28 +175,32 @@ function render(page, searchTerm, inCart, outCart, inventory = null, total = nul
   document.getElementById('complete-trade').addEventListener('click', completeTradeTransaction);
   document.getElementById('clear-trade-in-cart').addEventListener('click', clearTradeInCart);
   document.getElementById('clear-trade-out-cart').addEventListener('click', clearTradeOutCart);
+
+  // Add trade-out items from inventory to cart
   document.querySelectorAll('.add-to-trade-out').forEach(button => {
     button.addEventListener('click', () => {
       const { id, name, price, image, set, condition } = button.dataset;
       addToTradeOutCart(id, name, parseFloat(price), decodeURIComponent(image), set, condition);
     });
   });
+  // Update negotiated prices in trade-out cart
   document.querySelectorAll('.trade-out-price-input').forEach(input => {
     input.addEventListener('change', (e) => updateTradeOutPrice(input.dataset.id, e.target.value));
   });
-
+  // Handle TCG card data from main process
   ipcRenderer.removeAllListeners('tcg-card-data');
   ipcRenderer.on('tcg-card-data', (event, cards) => {
-    allTcgCards = cards;
-    currentTcgPage = 1;
-    renderTcgModal('trade-in');
+    allTcgCards = cards; // Store fetched TCG cards
+    currentTcgPage = 1; // Reset to first page
+    renderTcgModal('trade-in'); // Show TCG modal
   });
 
+  // Handle game data from main process
   ipcRenderer.removeAllListeners('game-data');
   ipcRenderer.on('game-data', (event, games) => {
     const gameList = document.getElementById('game-list-trade-in');
     if (!gameList) return console.error('Game list not found in DOM');
-    gameList.innerHTML = '';
+    gameList.innerHTML = ''; // Clear existing game list
     games.forEach((game, index) => {
       const gameDiv = document.createElement('div');
       gameDiv.style = 'border: 1px solid #ccc; padding: 10px; width: 200px; text-align: center;';
@@ -211,11 +215,11 @@ function render(page, searchTerm, inCart, outCart, inventory = null, total = nul
       gameList.appendChild(gameDiv);
     });
     const modal = document.getElementById('game-modal-trade-in');
-    if (modal) modal.style.display = 'flex';
+    if (modal) modal.style.display = 'flex'; // Show game modal
     document.querySelectorAll('#game-list-trade-in .select-game').forEach(button => {
       button.addEventListener('click', () => {
         const index = parseInt(button.dataset.index);
-        selectGame(games[index], 'trade-in');
+        selectGame(games[index], 'trade-in'); // Select game and populate form
       });
     });
   });
@@ -224,15 +228,17 @@ function render(page, searchTerm, inCart, outCart, inventory = null, total = nul
   ipcRenderer.on('game-data-error', (event, error) => console.error('Game data fetch error:', error));
 }
 
+// Fetches TCG card data from the main process for trade-in
 function fetchTcgCard(context) {
   const input = document.getElementById(`${context}-tcg-card-name`);
   if (!input) return console.error(`No input found for context: ${context}`);
   const cardName = input.value;
   if (!cardName) return console.error('No card name provided for', context);
   console.log(`Fetching TCG card for ${context}:`, cardName);
-  ipcRenderer.send('get-tcg-card', cardName);
+  ipcRenderer.send('get-tcg-card', cardName); // Send request to main process
 }
 
+// Handles selection of a TCG card from the modal, caching its image
 async function selectTcgCard(card, context) {
   console.log(`Selected TCG card for ${context}:`, card);
   const prefix = context;
@@ -249,6 +255,7 @@ async function selectTcgCard(card, context) {
   const cardSetField = document.getElementById(`${prefix}-card_set`);
   const rarityField = document.getElementById(`${prefix}-rarity`);
 
+  // Populate form fields with card data
   if (nameField) nameField.value = card.name;
   const defaultPrice = card.prices.tcgplayer.holofoil?.market_gbp || card.prices.cardmarket.average_gbp || 0;
   if (priceField) priceField.value = defaultPrice;
@@ -256,7 +263,7 @@ async function selectTcgCard(card, context) {
   if (conditionCategoryField) conditionCategoryField.value = '';
   if (conditionValueField) conditionValueField.value = '';
 
-  // Cache image on selection
+  // Cache the card image locally if not already cached
   let finalImageUrl = card.image_url;
   if (finalImageUrl) {
     const cacheDir = path.join(__dirname, 'images');
@@ -283,9 +290,10 @@ async function selectTcgCard(card, context) {
   if (cardSetField) cardSetField.value = card.card_set || '';
   if (rarityField) rarityField.value = card.rarity || '';
   
-  closeTcgModal(context);
+  closeTcgModal(context); // Close modal after selection
 }
 
+// Fetches game data from the main process for trade-in
 function fetchTradeInGameData() {
   const type = document.getElementById('trade-in-type-selector').value;
   if (type !== 'video_game') return;
@@ -296,6 +304,7 @@ function fetchTradeInGameData() {
   ipcRenderer.send('get-game-data', { name, platform });
 }
 
+// Handles selection of a game from the modal
 function selectGame(game, context) {
   console.log(`Selected game for ${context}:`, game);
   const prefix = context;
@@ -318,23 +327,27 @@ function selectGame(game, context) {
   if (imageUrlField) imageUrlField.value = game.image_url || '';
   if (platformField) platformField.value = game.platform.split(', ')[0] || '';
   
-  closeGameModal(context);
+  closeGameModal(context); // Handles selection of a game from the modal
 }
 
+// Closes the TCG card selection modal
 function closeTcgModal(context) {
   document.getElementById(`tcg-modal-${context}`).style.display = 'none';
 }
 
+// Closes the game selection modal
 function closeGameModal(context) {
   document.getElementById(`game-modal-${context}`).style.display = 'none';
 }
 
+// Adds an item to the trade-in cart from form inputs
 function addToTradeInCart() {
   const conditionCategory = document.getElementById('trade-in-condition-category').value;
   const conditionValue = document.getElementById('trade-in-condition-value').value;
   const condition = conditionCategory ? `${conditionCategory}${conditionValue ? ' ' + conditionValue : ''}` : conditionValue;
   const type = document.getElementById('trade-in-type-selector').value;
   const attributes = {};
+  // Populate attributes based on item type
   if (type === 'pokemon_tcg' || type === 'other_tcg') {
     attributes.tcg_id = document.getElementById('trade-in-tcg_id')?.value || null;
     attributes.card_set = document.getElementById('trade-in-card_set')?.value || null;
@@ -353,7 +366,7 @@ function addToTradeInCart() {
   }
 
   const tradeInItem = {
-    id: Date.now().toString(),
+    id: Date.now().toString(), // Unique ID based on current time
     type,
     name: document.getElementById('trade-in-name').value,
     price: parseFloat(document.getElementById('trade-in-price').value) || 0,
@@ -361,19 +374,21 @@ function addToTradeInCart() {
     condition: condition || null,
     image_url: document.getElementById('trade-in-image-url').value || null,
     attributes,
-    role: 'trade_in'
+    role: 'trade_in' // Trade-in item from customer
   };
   tradeInCart.push(tradeInItem);
   console.log('Adding to trade-in cart:', tradeInItem);
   render(tradeOutPage, tradeOutSearchTerm, tradeInCart, tradeOutCart);
 }
 
+// Adds an item from inventory to the trade-out cart
 function addToTradeOutCart(id, name, price, image_url, card_set, condition) {
   console.log('Adding to trade-out cart:', { id, name, price, image_url, card_set, condition });
   tradeOutCart.push({ id, name, price, image_url: decodeURIComponent(image_url), card_set, condition, role: 'trade_out' });
   fetchInventory(tradeOutPage, tradeOutSearchTerm);
 }
 
+// Updates the negotiated price for an item in the trade-out cart
 function updateTradeOutPrice(id, value) {
   const index = tradeOutCart.findIndex(item => item.id === id);
   if (index !== -1) {
@@ -383,46 +398,51 @@ function updateTradeOutPrice(id, value) {
   fetchInventory(tradeOutPage, tradeOutSearchTerm);
 }
 
+// Completes the trade transaction, sending carts to main process
 function completeTradeTransaction() {
   console.log('Completing trade transaction:', { tradeInCart, tradeOutCart });
   const items = [...tradeInCart, ...tradeOutCart];
-  const cashIn = tradeOutCart.reduce((sum, item) => sum + parseFloat(item.negotiatedPrice || item.price), 0);
-  const cashOut = tradeInCart.reduce((sum, item) => sum + parseFloat(item.tradeValue), 0);
+  const cashIn = tradeOutCart.reduce((sum, item) => sum + parseFloat(item.negotiatedPrice || item.price), 0); // Total customer pays
+  const cashOut = tradeInCart.reduce((sum, item) => sum + parseFloat(item.tradeValue), 0); // Total store pays
   
   tradeInCart.forEach(item => {
     const itemData = { ...item, ...item.attributes };
-    ipcRenderer.send('add-item', itemData);
+    ipcRenderer.send('add-item', itemData); // Add trade-in items to inventory
   });
   
   ipcRenderer.send('complete-transaction', { items, type: 'trade', cashIn, cashOut });
   ipcRenderer.once('transaction-complete', (event, data) => {
     console.log('Trade transaction completed');
-    tradeInCart.length = 0;
-    tradeOutCart.length = 0;
-    require('../renderer').showScreen('trade');
+    tradeInCart.length = 0; // Clear trade-in cart
+    tradeOutCart.length = 0; // Clear trade-out cart
+    require('../renderer').showScreen('trade'); // Reload Trade screen
   });
   ipcRenderer.once('transaction-error', (event, error) => console.error('Trade transaction failed:', error));
 }
 
+// Clears the trade-in cart
 function clearTradeInCart() {
-  tradeInCart.length = 0;
+  tradeInCart.length = 0; // Empty trade-in cart
   fetchInventory(tradeOutPage, tradeOutSearchTerm);
 }
 
+// Clears the trade-out cart
 function clearTradeOutCart() {
-  tradeOutCart.length = 0;
+  tradeOutCart.length = 0; // Empty trade-out cart
   fetchInventory(tradeOutPage, tradeOutSearchTerm);
 }
 
+// Updates attribute fields in the trade-in form based on item type
 function updateAttributeFields(context) {
   const type = document.getElementById(`${context}-type-selector`).value;
   const attributesDiv = document.getElementById(`${context}-attributes`);
   const tcgFetchDiv = document.getElementById(`${context}-tcg-fetch`);
   const gameFetchDiv = document.getElementById(`${context}-game-fetch`);
-  attributesDiv.innerHTML = '';
+  attributesDiv.innerHTML = ''; // Clear existing attributes
   if (tcgFetchDiv) tcgFetchDiv.style.display = (type === 'pokemon_tcg' || type === 'other_tcg') ? 'block' : 'none';
   if (gameFetchDiv) gameFetchDiv.style.display = (type === 'video_game') ? 'block' : 'none';
 
+  // Add specific fields based on item type
   if (type === 'pokemon_tcg' || type === 'other_tcg') {
     attributesDiv.innerHTML = `
       <input id="${context}-tcg_id" type="hidden">
@@ -476,20 +496,22 @@ function updateAttributeFields(context) {
   }
 }
 
+// Updates condition options in the trade-in form dropdown
 function updateConditionOptions(context) {
   const type = document.getElementById(`${context}-type-selector`).value;
   const conditionSelect = document.getElementById(`${context}-condition-category`);
-  conditionSelect.innerHTML = '<option value="">Select Condition</option>';
+  conditionSelect.innerHTML = '<option value="">Select Condition</option>'; // Clear existing options
 
   const options = {
-    'pokemon_tcg': ['Raw', 'PSA', 'CGC', 'BGS', 'TAG', 'Other'],
-    'other_tcg': ['Raw', 'PSA', 'CGC', 'BGS', 'TAG', 'Other'],
+    'pokemon_tcg': ['Raw', 'PSA', 'CGC', 'BGS', 'TAG', 'Other'], // TCG-specific conditions
+    'other_tcg': ['Raw', 'PSA', 'CGC', 'BGS', 'TAG', 'Other'], // TCG-specific conditions
     'video_game': ['New', 'Used', 'CIB', 'Loose', 'Graded'],
-    'console': ['New', 'Used', 'Refurbished', 'Broken'],
+    'console': ['New', 'Used', 'Refurbished', 'Broken'], // Tech-specific conditions
     'football_shirt': ['New', 'Worn', 'Signed', 'Game-Worn'],
     'coin': ['Uncirculated', 'Circulated', 'Proof', 'Graded']
   }[type] || [];
 
+  // Populate condition options
   options.forEach(option => {
     const opt = document.createElement('option');
     opt.value = option;

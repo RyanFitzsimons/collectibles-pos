@@ -116,14 +116,14 @@ function updateSellPrice(id, value) {
 // Complete a Sell transaction and clear the cart
 function completeSellTransaction() {
   console.log('Completing sell transaction:', { sellCart });
-  const items = sellCart.slice();
-  const cashIn = sellCart.reduce((sum, item) => sum + parseFloat(item.negotiatedPrice || item.price), 0);
-  const cashOut = 0;
-  ipcRenderer.send('complete-transaction', { items, type: 'sell', cashIn, cashOut });
+  const items = sellCart.slice(); // Copy cart items
+  const cashIn = sellCart.reduce((sum, item) => sum + parseFloat(item.negotiatedPrice || item.price), 0); // Total cash received from customer
+  const cashOut = 0; // No cash paid out by store for sell
+  ipcRenderer.send('complete-transaction', { items, type: 'sell', cashIn, cashOut }); // Send transaction data to main process
   ipcRenderer.once('transaction-complete', (event, data) => {
     console.log('Sell transaction completed');
-    sellCart.length = 0;
-    require('../renderer').showScreen('sell');
+    sellCart.length = 0; // Clear cart after completion
+    require('../renderer').showScreen('sell'); // Reload Sell screen
   });
   ipcRenderer.once('transaction-error', (event, error) => console.error('Sell transaction failed:', error));
 }
