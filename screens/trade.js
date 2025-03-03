@@ -1,37 +1,37 @@
-// Imports
-const { ipcRenderer } = require('electron');
-const { cleanPrice, debounce } = require('../utils');
-const { tradeInCart, tradeOutCart } = require('../cart');
-const axios = require('axios'); // Library for HTTP requests (e.g., image caching)
-const fs = require('fs');  // File system module for saving images
-const path = require('path'); // Path utilities for file operations
+// Imports required modules for Electron communication, utilities, cart management, and file operations
+const { ipcRenderer } = require('electron');  // Electron IPC for communicating with main process
+const { cleanPrice, debounce } = require('../utils');  // Utility functions: cleanPrice formats prices, debounce delays event handling
+const { tradeInCart, tradeOutCart } = require('../cart');  // Cart module providing tradeInCart and tradeOutCart arrays
+const axios = require('axios');  // Library for HTTP requests, used for fetching and caching images
+const fs = require('fs');  // File system module for saving cached images
+const path = require('path');  // Path utilities for constructing file paths
 
-// Tracks the current page and search term for trade-out inventory
-let allTcgCards = [];
-let currentTcgPage = 1;
-const itemsPerPage = 12;
+// Global variables for TCG card modal pagination and trade-out inventory tracking
+let allTcgCards = [];  // Array to store all fetched TCG cards for trade-in modal
+let currentTcgPage = 1;  // Tracks the current page of TCG cards in the modal
+const itemsPerPage = 12;  // Number of TCG cards shown per page in the modal
 
-// Fetches inventory data from the main process for trade-out section
+// Fetches inventory data from the main process for the trade-out section
 function fetchInventory(page, searchTerm) {
-  ipcRenderer.send('get-inventory', { page, limit: 50, search: searchTerm }); // Request inventory data with pagination and search
+  ipcRenderer.send('get-inventory', { page, limit: 50, search: searchTerm });  // Requests inventory data with pagination and search term
   ipcRenderer.once('inventory-data', (event, { items, total }) => {
-    render(page, searchTerm, tradeInCart, tradeOutCart, items, total); // Render UI with fetched data
+    render(page, searchTerm, tradeInCart, tradeOutCart, items, total);  // Renders Trade tab with fetched inventory
   });
 }
 
 // Renders the Trade screen UI, including trade-in form and trade-out inventory
 function render(page, searchTerm, inCart, outCart, inventory = null, total = null) {
-  const content = document.getElementById('content');
+  const content = document.getElementById('content');  // Gets the main content container from the DOM
   if (!inventory || total === null) {
-    fetchInventory(page, searchTerm); // Fetch inventory if not provided
+    fetchInventory(page, searchTerm);  // Fetches inventory if not provided
     return;
   }
 
-  const tradeInTotal = inCart.reduce((sum, item) => sum + item.tradeValue, 0); // Total trade-in value (customer gives)
-  const tradeOutTotal = outCart.reduce((sum, item) => sum + (parseFloat(item.negotiatedPrice) || item.price), 0); // Total trade-out value (customer gets)
-  const cashDue = Math.max(tradeOutTotal - tradeInTotal, 0); // Cash customer owes if trade-out exceeds trade-in
-  const cashBack = tradeInTotal > tradeOutTotal ? tradeInTotal - tradeOutTotal : 0; // Cash store owes if trade-in exceeds trade-out
-  const totalPages = Math.ceil(total / 50); // Total pages for trade-out inventory pagination
+  const tradeInTotal = inCart.reduce((sum, item) => sum + item.tradeValue, 0);  // Calculates total trade-in value (customer gives)
+  const tradeOutTotal = outCart.reduce((sum, item) => sum + (parseFloat(item.negotiatedPrice) || item.price), 0);  // Calculates total trade-out value (customer gets)
+  const cashDue = Math.max(tradeOutTotal - tradeInTotal, 0);  // Cash customer owes if trade-out exceeds trade-in
+  const cashBack = tradeInTotal > tradeOutTotal ? tradeInTotal - tradeOutTotal : 0;  // Cash store owes if trade-in exceeds trade-out
+  const totalPages = Math.ceil(total / 50);  // Calculates total pages for trade-out inventory pagination
 
   content.innerHTML = `
     <div class="trade-container">
@@ -101,13 +101,13 @@ function render(page, searchTerm, inCart, outCart, inventory = null, total = nul
           <ul id="trade-in-items">
             ${inCart.map(item => `
               <li>
-                ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}" style="max-width: 50px;">` : ''}
+                ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}" style="max-width: 50px;">` : ''}  // Displays trade-in item image
                 ${item.name} (${item.type}) - ${cleanPrice(item.tradeValue)} (${item.condition || 'Not Set'})
               </li>
-            `).join('')}
+            `).join('')}  // Lists trade-in cart items
           </ul>
-          <p>Total Trade-In Value: ${cleanPrice(tradeInTotal.toFixed(2))}, Items: ${inCart.length}</p>
-          <button id="clear-trade-in-cart">Clear Cart</button>
+          <p>Total Trade-In Value: ${cleanPrice(tradeInTotal.toFixed(2))}, Items: ${inCart.length}</p>  // Shows total trade-in value and item count
+          <button id="clear-trade-in-cart">Clear Cart</button>  // Button to clear trade-in cart
         </div>
       </div>
       <div class="trade-section trade-out">
@@ -117,16 +117,16 @@ function render(page, searchTerm, inCart, outCart, inventory = null, total = nul
           <ul id="trade-out-inventory-list">
             ${inventory.map(item => `
               <li>
-                ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}">` : ''}
+                ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}">` : ''}  // Displays inventory item image
                 ${item.name} (${item.type}) - ${cleanPrice(item.price)} (${item.condition || 'Not Set'}) 
                 <button class="add-to-trade-out" data-id="${item.id}" data-name="${item.name}" data-price="${item.price}" data-image="${encodeURIComponent(item.image_url || '')}" data-set="${item.attributes.card_set || ''}" data-condition="${item.condition || ''}">Add</button>
               </li>
-            `).join('')}
+            `).join('')}  // Lists trade-out inventory items with Add buttons
           </ul>
           <div>
-            <button id="trade-out-prev-page" ${page === 1 ? 'disabled' : ''}>Previous</button>
-            <span>Page ${page} of ${totalPages}</span>
-            <button id="trade-out-next-page" ${page >= totalPages ? 'disabled' : ''}>Next</button>
+            <button id="trade-out-prev-page" ${page === 1 ? 'disabled' : ''}>Previous</button>  // Previous page button
+            <span>Page ${page} of ${totalPages}</span>  // Page info
+            <button id="trade-out-next-page" ${page >= totalPages ? 'disabled' : ''}>Next</button>  // Next page button
           </div>
         </div>
         <div class="section">
@@ -134,76 +134,78 @@ function render(page, searchTerm, inCart, outCart, inventory = null, total = nul
           <ul id="trade-out-items">
             ${outCart.map(item => `
               <li>
-                ${item.image_url ? `<img src="${decodeURIComponent(item.image_url)}" alt="${item.name}" style="max-width: 50px;">` : 'No Image'}
+                ${item.image_url ? `<img src="${decodeURIComponent(item.image_url)}" alt="${item.name}" style="max-width: 50px;">` : 'No Image'}  // Displays trade-out cart item image
                 ${item.name} (${item.type}) - 
-                <input type="number" value="${item.negotiatedPrice || item.price}" class="trade-out-price-input" data-id="${item.id}" style="width: 60px;">
-                (Original: ${cleanPrice(item.price)}, ${item.condition || 'Not Set'})
+                <input type="number" value="${item.negotiatedPrice || item.price}" class="trade-out-price-input" data-id="${item.id}" style="width: 60px;">  // Editable negotiated price
+                (Original: ${cleanPrice(item.price)}, ${item.condition || 'Not Set'})  // Shows original price and condition
               </li>
-            `).join('')}
+            `).join('')}  // Lists trade-out cart items with editable prices
           </ul>
-          <p>Total Trade-Out Value: ${cleanPrice(tradeOutTotal.toFixed(2))}, Items: ${outCart.length}</p>
-          <p>Cash Due: ${cleanPrice(cashDue.toFixed(2))}</p>
-          ${cashBack > 0 ? `<p>Cash Back: ${cleanPrice(cashBack.toFixed(2))}</p>` : ''}
-          <button id="complete-trade">Complete Trade</button>
-          <button id="clear-trade-out-cart">Clear Cart</button>
+          <p>Total Trade-Out Value: ${cleanPrice(tradeOutTotal.toFixed(2))}, Items: ${outCart.length}</p>  // Shows total trade-out value and item count
+          <p>Cash Due: ${cleanPrice(cashDue.toFixed(2))}</p>  // Shows cash customer owes
+          ${cashBack > 0 ? `<p>Cash Back: ${cleanPrice(cashBack.toFixed(2))}</p>` : ''}  // Shows cash back if applicable
+          <button id="complete-trade">Complete Trade</button>  // Button to complete transaction
+          <button id="clear-trade-out-cart">Clear Cart</button>  // Button to clear trade-out cart
         </div>
       </div>
     </div>
-  `;
+  `;  // Sets the HTML content for the Trade screen
 
-  // Set up trade-in form event listeners
-  const typeSelector = document.getElementById('trade-in-type-selector');
+  // Sets up trade-in form event listeners
+  const typeSelector = document.getElementById('trade-in-type-selector');  // Gets trade-in type selector
   typeSelector.addEventListener('change', () => {
-    console.log('Type changed to:', typeSelector.value);
-    updateAttributeFields('trade-in'); // Update form fields based on type
-    updateConditionOptions('trade-in');
+    console.log('Type changed to:', typeSelector.value);  // Logs type change
+    updateAttributeFields('trade-in');  // Updates form fields based on type
+    updateConditionOptions('trade-in');  // Updates condition dropdown
   });
-  updateAttributeFields('trade-in');
-  updateConditionOptions('trade-in');
+  updateAttributeFields('trade-in');  // Initial call to set up attributes
+  updateConditionOptions('trade-in');  // Initial call to set up condition options
 
-  // Search trade-out inventory with debounce to reduce fetch frequency
+  // Adds search functionality for trade-out inventory with debounce
   document.getElementById('trade-out-search').addEventListener('input', debounce((e) => {
-    fetchInventory(1, e.target.value); // Fetch page 1 with new search term
-  }, 600));
+    fetchInventory(1, e.target.value);  // Fetches page 1 with new search term
+  }, 600));  // 600ms delay for debounce
 
-  // Add event listeners for buttons
-  document.getElementById('fetch-trade-in-card')?.addEventListener('click', () => fetchTcgCard('trade-in'));
-  document.getElementById('close-tcg-modal-trade-in')?.addEventListener('click', () => closeTcgModal('trade-in'));
-  document.getElementById('fetch-trade-in-game-data')?.addEventListener('click', fetchTradeInGameData);
-  document.getElementById('close-game-modal-trade-in')?.addEventListener('click', () => closeGameModal('trade-in'));
-  document.getElementById('add-to-trade-in').addEventListener('click', addToTradeInCart);
-  document.getElementById('complete-trade').addEventListener('click', completeTradeTransaction);
-  document.getElementById('clear-trade-in-cart').addEventListener('click', clearTradeInCart);
-  document.getElementById('clear-trade-out-cart').addEventListener('click', clearTradeOutCart);
+  // Adds event listeners for UI buttons
+  document.getElementById('fetch-trade-in-card')?.addEventListener('click', () => fetchTcgCard('trade-in'));  // Fetches TCG card data
+  document.getElementById('close-tcg-modal-trade-in')?.addEventListener('click', () => closeTcgModal('trade-in'));  // Closes TCG modal
+  document.getElementById('fetch-trade-in-game-data')?.addEventListener('click', fetchTradeInGameData);  // Fetches game data
+  document.getElementById('close-game-modal-trade-in')?.addEventListener('click', () => closeGameModal('trade-in'));  // Closes game modal
+  document.getElementById('add-to-trade-in').addEventListener('click', addToTradeInCart);  // Adds item to trade-in cart
+  document.getElementById('complete-trade').addEventListener('click', completeTradeTransaction);  // Completes trade transaction
+  document.getElementById('clear-trade-in-cart').addEventListener('click', clearTradeInCart);  // Clears trade-in cart
+  document.getElementById('clear-trade-out-cart').addEventListener('click', clearTradeOutCart);  // Clears trade-out cart
 
-  // Add trade-out items from inventory to cart
+  // Adds trade-out items from inventory to cart
   document.querySelectorAll('.add-to-trade-out').forEach(button => {
     button.addEventListener('click', () => {
-      const { id, name, price, image, set, condition } = button.dataset;
-      addToTradeOutCart(id, name, parseFloat(price), decodeURIComponent(image), set, condition);
+      const { id, name, price, image, set, condition } = button.dataset;  // Gets item data from button attributes
+      addToTradeOutCart(id, name, parseFloat(price), decodeURIComponent(image), set, condition);  // Adds item to trade-out cart
     });
   });
-  // Update negotiated prices in trade-out cart
+
+  // Updates negotiated prices in trade-out cart
   document.querySelectorAll('.trade-out-price-input').forEach(input => {
-    input.addEventListener('change', (e) => updateTradeOutPrice(input.dataset.id, e.target.value));
-  });
-  // Handle TCG card data from main process
-  ipcRenderer.removeAllListeners('tcg-card-data');
-  ipcRenderer.on('tcg-card-data', (event, cards) => {
-    allTcgCards = cards; // Store fetched TCG cards
-    currentTcgPage = 1; // Reset to first page
-    renderTcgModal('trade-in'); // Show TCG modal
+    input.addEventListener('change', (e) => updateTradeOutPrice(input.dataset.id, e.target.value));  // Updates price on change
   });
 
-  // Handle game data from main process
+  // Removes existing TCG card data listeners to prevent duplicates
+  ipcRenderer.removeAllListeners('tcg-card-data');
+  ipcRenderer.on('tcg-card-data', (event, cards) => {
+    allTcgCards = cards;  // Stores fetched TCG cards
+    currentTcgPage = 1;  // Resets to first page
+    renderTcgModal('trade-in');  // Shows TCG modal
+  });
+
+  // Handles game data received from main process
   ipcRenderer.removeAllListeners('game-data');
   ipcRenderer.on('game-data', (event, games) => {
-    const gameList = document.getElementById('game-list-trade-in');
-    if (!gameList) return console.error('Game list not found in DOM');
-    gameList.innerHTML = ''; // Clear existing game list
+    const gameList = document.getElementById('game-list-trade-in');  // Gets game list container
+    if (!gameList) return console.error('Game list not found in DOM');  // Errors if list missing
+    gameList.innerHTML = '';  // Clears existing game list
     games.forEach((game, index) => {
       const gameDiv = document.createElement('div');
-      gameDiv.style = 'border: 1px solid #ccc; padding: 10px; width: 200px; text-align: center;';
+      gameDiv.style = 'border: 1px solid #ccc; padding: 10px; width: 200px; text-align: center;';  // Styles game card
       gameDiv.innerHTML = `
         ${game.image_url ? `<img src="${game.image_url}" alt="${game.name}" style="width: auto; height: auto; max-width: 180px; max-height: 250px;">` : 'No Image'}
         <p><strong>${game.name}</strong></p>
@@ -211,251 +213,262 @@ function render(page, searchTerm, inCart, outCart, inventory = null, total = nul
         <p>Release: ${game.release_date || 'N/A'}</p>
         <p>Genres: ${game.genres || 'N/A'}</p>
         <button class="select-game" data-index="${index}">Select</button>
-      `;
-      gameList.appendChild(gameDiv);
+      `;  // HTML for each game card
+      gameList.appendChild(gameDiv);  // Adds game card to list
     });
     const modal = document.getElementById('game-modal-trade-in');
-    if (modal) modal.style.display = 'flex'; // Show game modal
+    if (modal) modal.style.display = 'flex';  // Shows game modal
     document.querySelectorAll('#game-list-trade-in .select-game').forEach(button => {
       button.addEventListener('click', () => {
-        const index = parseInt(button.dataset.index);
-        selectGame(games[index], 'trade-in'); // Select game and populate form
+        const index = parseInt(button.dataset.index);  // Gets index of selected game
+        selectGame(games[index], 'trade-in');  // Populates form with selected game
       });
     });
   });
 
+  // Logs errors from main process for TCG card or game data fetching
   ipcRenderer.on('tcg-card-error', (event, error) => console.error('TCG card fetch error:', error));
   ipcRenderer.on('game-data-error', (event, error) => console.error('Game data fetch error:', error));
 }
 
 // Fetches TCG card data from the main process for trade-in
 function fetchTcgCard(context) {
-  const input = document.getElementById(`${context}-tcg-card-name`);
-  if (!input) return console.error(`No input found for context: ${context}`);
+  const input = document.getElementById(`${context}-tcg-card-name`);  // Gets TCG search input field
+  if (!input) return console.error(`No input found for context: ${context}`);  // Errors if input missing
   const cardName = input.value;
-  if (!cardName) return console.error('No card name provided for', context);
-  console.log(`Fetching TCG card for ${context}:`, cardName);
-  ipcRenderer.send('get-tcg-card', cardName); // Send request to main process
+  if (!cardName) return console.error('No card name provided for', context);  // Errors if no name entered
+  console.log(`Fetching TCG card for ${context}:`, cardName);  // Logs fetch attempt
+  ipcRenderer.send('get-tcg-card', cardName);  // Sends fetch request to main process
 }
 
 // Handles selection of a TCG card from the modal, caching its image
 async function selectTcgCard(card, context) {
-  console.log(`Selected TCG card for ${context}:`, card);
+  console.log(`Selected TCG card for ${context}:`, card);  // Logs selected card
   const prefix = context;
-  document.getElementById(`${prefix}-type-selector`).value = 'pokemon_tcg';
-  updateAttributeFields(context);
-  updateConditionOptions(context);
-  const nameField = document.getElementById(`${prefix}-name`);
-  const priceField = document.getElementById(`${prefix}-price`);
-  const tradeValueField = document.getElementById(`${prefix}-value`);
-  const conditionCategoryField = document.getElementById(`${prefix}-condition-category`);
-  const conditionValueField = document.getElementById(`${prefix}-condition-value`);
-  const imageUrlField = document.getElementById(`${prefix}-image-url`);
-  const tcgIdField = document.getElementById(`${prefix}-tcg_id`);
-  const cardSetField = document.getElementById(`${prefix}-card_set`);
-  const rarityField = document.getElementById(`${prefix}-rarity`);
+  document.getElementById(`${prefix}-type-selector`).value = 'pokemon_tcg';  // Sets type to Pokémon TCG
+  updateAttributeFields(context);  // Updates form attributes
+  updateConditionOptions(context);  // Updates condition dropdown
+  const nameField = document.getElementById(`${prefix}-name`);  // Name input
+  const priceField = document.getElementById(`${prefix}-price`);  // Market price input
+  const tradeValueField = document.getElementById(`${prefix}-value`);  // Trade value input (note: 'trade-in-value' in HTML)
+  const conditionCategoryField = document.getElementById(`${prefix}-condition-category`);  // Condition category dropdown
+  const conditionValueField = document.getElementById(`${prefix}-condition-value`);  // Condition details input
+  const imageUrlField = document.getElementById(`${prefix}-image-url`);  // Hidden image URL field
+  const tcgIdField = document.getElementById(`${prefix}-tcg_id`);  // TCG ID hidden field
+  const cardSetField = document.getElementById(`${prefix}-card_set`);  // Card set hidden field
+  const rarityField = document.getElementById(`${prefix}-rarity`);  // Rarity hidden field
 
-  // Populate form fields with card data
-  if (nameField) nameField.value = card.name;
-  const defaultPrice = card.prices.tcgplayer.holofoil?.market_gbp || card.prices.cardmarket.average_gbp || 0;
-  if (priceField) priceField.value = defaultPrice;
-  if (tradeValueField) tradeValueField.value = Math.floor(defaultPrice * 0.5);
-  if (conditionCategoryField) conditionCategoryField.value = '';
-  if (conditionValueField) conditionValueField.value = '';
+  // Populates form fields with card data
+  if (nameField) nameField.value = card.name;  // Sets item name
+  const defaultPrice = card.prices.tcgplayer.holofoil?.market_gbp || card.prices.cardmarket.average_gbp || 0;  // Default price from TCGPlayer or Cardmarket
+  if (priceField) priceField.value = defaultPrice;  // Sets market price
+  if (tradeValueField) tradeValueField.value = Math.floor(defaultPrice * 0.5);  // Sets trade value as half market price
+  if (conditionCategoryField) conditionCategoryField.value = '';  // Resets condition category
+  if (conditionValueField) conditionValueField.value = '';  // Resets condition details
 
-  // Cache the card image locally if not already cached
+  // Caches the card image locally if not already cached
   let finalImageUrl = card.image_url;
   if (finalImageUrl) {
-    const cacheDir = path.join(__dirname, 'images');
-    const cacheFileName = `${card.id}.png`;
-    const cachePath = path.join(cacheDir, cacheFileName);
+    const cacheDir = path.join(__dirname, 'images');  // Directory for cached images
+    const cacheFileName = `${card.id}.png`;  // Filename based on card ID
+    const cachePath = path.join(cacheDir, cacheFileName);  // Full path for cached image
 
-    if (!fs.existsSync(cachePath)) {
+    if (!fs.existsSync(cachePath)) {  // Checks if image isn’t already cached
       try {
-        const imageResponse = await axios.get(finalImageUrl, { responseType: 'arraybuffer' });
-        fs.mkdirSync(cacheDir, { recursive: true });
-        fs.writeFileSync(cachePath, Buffer.from(imageResponse.data));
-        console.log('Image cached on selection:', cachePath);
+        const imageResponse = await axios.get(finalImageUrl, { responseType: 'arraybuffer' });  // Fetches image data
+        fs.mkdirSync(cacheDir, { recursive: true });  // Creates directory if it doesn’t exist
+        fs.writeFileSync(cachePath, Buffer.from(imageResponse.data));  // Saves image to disk
+        console.log('Image cached on selection:', cachePath);  // Logs successful caching
       } catch (err) {
-        console.error('Image cache error:', err.message);
+        console.error('Image cache error:', err.message);  // Logs any caching errors
       }
     }
-    finalImageUrl = `file://${cachePath}`;
+    finalImageUrl = `file://${cachePath}`;  // Updates URL to local file path
   }
   if (imageUrlField) {
-    imageUrlField.value = finalImageUrl || '';
-    console.log(`Set image_url for ${prefix}: ${finalImageUrl}`);
+    imageUrlField.value = finalImageUrl || '';  // Sets hidden image URL field
+    console.log(`Set image_url for ${prefix}: ${finalImageUrl}`);  // Logs image URL setting
   }
-  if (tcgIdField) tcgIdField.value = card.tcg_id || '';
-  if (cardSetField) cardSetField.value = card.card_set || '';
-  if (rarityField) rarityField.value = card.rarity || '';
+  if (tcgIdField) tcgIdField.value = card.tcg_id || '';  // Sets TCG ID
+  if (cardSetField) cardSetField.value = card.card_set || '';  // Sets card set
+  if (rarityField) rarityField.value = card.rarity || '';  // Sets rarity
   
-  closeTcgModal(context); // Close modal after selection
+  closeTcgModal(context);  // Closes the modal after selection
 }
 
 // Fetches game data from the main process for trade-in
 function fetchTradeInGameData() {
-  const type = document.getElementById('trade-in-type-selector').value;
-  if (type !== 'video_game') return;
-  const name = document.getElementById('trade-in-game-name').value || document.getElementById('trade-in-name').value;
-  const platform = document.getElementById('trade-in-platform').value || '';
-  if (!name) return console.error('Name required for video game fetch');
-  console.log('Fetching game data for:', name, platform || 'all platforms');
-  ipcRenderer.send('get-game-data', { name, platform });
+  const type = document.getElementById('trade-in-type-selector').value;  // Gets selected item type
+  if (type !== 'video_game') return;  // Exits if not video game type
+  const name = document.getElementById('trade-in-game-name').value || document.getElementById('trade-in-name').value;  // Gets game name from search or main field
+  const platform = document.getElementById('trade-in-platform').value || '';  // Gets platform if specified
+  if (!name) return console.error('Name required for video game fetch');  // Errors if no name provided
+  console.log('Fetching game data for:', name, platform || 'all platforms');  // Logs fetch attempt
+  ipcRenderer.send('get-game-data', { name, platform });  // Sends fetch request to main process
 }
 
 // Handles selection of a game from the modal
 function selectGame(game, context) {
-  console.log(`Selected game for ${context}:`, game);
+  console.log(`Selected game for ${context}:`, game);  // Logs selected game
   const prefix = context;
-  document.getElementById(`${prefix}-type-selector`).value = 'video_game';
-  updateAttributeFields(context);
-  updateConditionOptions(context);
-  const nameField = document.getElementById(`${prefix}-name`);
-  const priceField = document.getElementById(`${prefix}-price`);
-  const tradeValueField = document.getElementById(`${prefix}-value`);
-  const conditionCategoryField = document.getElementById(`${prefix}-condition-category`);
-  const conditionValueField = document.getElementById(`${prefix}-condition-value`);
-  const imageUrlField = document.getElementById(`${prefix}-image-url`);
-  const platformField = document.getElementById(`${prefix}-platform`);
+  document.getElementById(`${prefix}-type-selector`).value = 'video_game';  // Sets type to video game
+  updateAttributeFields(context);  // Updates form attributes
+  updateConditionOptions(context);  // Updates condition dropdown
+  const nameField = document.getElementById(`${prefix}-name`);  // Name input
+  const priceField = document.getElementById(`${prefix}-price`);  // Price input
+  const tradeValueField = document.getElementById(`${prefix}-value`);  // Trade value input (note: 'trade-in-value' in HTML)
+  const conditionCategoryField = document.getElementById(`${prefix}-condition-category`);  // Condition category dropdown
+  const conditionValueField = document.getElementById(`${prefix}-condition-value`);  // Condition details input
+  const imageUrlField = document.getElementById(`${prefix}-image-url`);  // Hidden image URL field
+  const platformField = document.getElementById(`${prefix}-platform`);  // Platform input
 
-  if (nameField) nameField.value = game.name;
-  if (priceField) priceField.value = game.price;
-  if (tradeValueField) tradeValueField.value = game.tradeValue;
-  if (conditionCategoryField) conditionCategoryField.value = '';
-  if (conditionValueField) conditionValueField.value = '';
-  if (imageUrlField) imageUrlField.value = game.image_url || '';
-  if (platformField) platformField.value = game.platform.split(', ')[0] || '';
+  // Populates form fields with game data
+  if (nameField) nameField.value = game.name;  // Sets game name
+  if (priceField) priceField.value = game.price;  // Sets price (assumes game.price exists)
+  if (tradeValueField) tradeValueField.value = game.tradeValue;  // Sets trade value (assumes game.tradeValue exists)
+  if (conditionCategoryField) conditionCategoryField.value = '';  // Resets condition category
+  if (conditionValueField) conditionValueField.value = '';  // Resets condition details
+  if (imageUrlField) imageUrlField.value = game.image_url || '';  // Sets image URL
+  if (platformField) platformField.value = game.platform.split(', ')[0] || '';  // Sets first platform if multiple
   
-  closeGameModal(context); // Handles selection of a game from the modal
+  closeGameModal(context);  // Closes the modal after selection
 }
 
 // Closes the TCG card selection modal
 function closeTcgModal(context) {
-  document.getElementById(`tcg-modal-${context}`).style.display = 'none';
+  document.getElementById(`tcg-modal-${context}`).style.display = 'none';  // Hides the TCG modal
 }
 
 // Closes the game selection modal
 function closeGameModal(context) {
-  document.getElementById(`game-modal-${context}`).style.display = 'none';
+  document.getElementById(`game-modal-${context}`).style.display = 'none';  // Hides the game modal
 }
 
 // Adds an item to the trade-in cart from form inputs
 function addToTradeInCart() {
-  const conditionCategory = document.getElementById('trade-in-condition-category').value;
-  const conditionValue = document.getElementById('trade-in-condition-value').value;
-  const condition = conditionCategory ? `${conditionCategory}${conditionValue ? ' ' + conditionValue : ''}` : conditionValue;
-  const type = document.getElementById('trade-in-type-selector').value;
-  const attributes = {};
-  // Populate attributes based on item type
+  const conditionCategory = document.getElementById('trade-in-condition-category').value;  // Gets condition category
+  const conditionValue = document.getElementById('trade-in-condition-value').value;  // Gets condition details
+  const condition = conditionCategory ? `${conditionCategory}${conditionValue ? ' ' + conditionValue : ''}` : conditionValue;  // Combines condition data
+  const type = document.getElementById('trade-in-type-selector').value;  // Gets selected item type
+  const attributes = {};  // Object to store type-specific attributes
+  
+  // Populates attributes based on item type
   if (type === 'pokemon_tcg' || type === 'other_tcg') {
-    attributes.tcg_id = document.getElementById('trade-in-tcg_id')?.value || null;
-    attributes.card_set = document.getElementById('trade-in-card_set')?.value || null;
-    attributes.rarity = document.getElementById('trade-in-rarity')?.value || null;
+    attributes.tcg_id = document.getElementById('trade-in-tcg_id')?.value || null;  // TCG ID
+    attributes.card_set = document.getElementById('trade-in-card_set')?.value || null;  // Card set
+    attributes.rarity = document.getElementById('trade-in-rarity')?.value || null;  // Rarity
   } else if (type === 'video_game') {
-    attributes.platform = document.getElementById('trade-in-platform')?.value || null;
+    attributes.platform = document.getElementById('trade-in-platform')?.value || null;  // Platform for video games
   } else if (type === 'console') {
-    attributes.brand = document.getElementById('trade-in-brand')?.value || null;
-    attributes.model = document.getElementById('trade-in-model')?.value || null;
+    attributes.brand = document.getElementById('trade-in-brand')?.value || null;  // Console brand
+    attributes.model = document.getElementById('trade-in-model')?.value || null;  // Console model
   } else if (type === 'football_shirt') {
-    attributes.team = document.getElementById('trade-in-team')?.value || null;
-    attributes.year = document.getElementById('trade-in-year')?.value || null;
+    attributes.team = document.getElementById('trade-in-team')?.value || null;  // Shirt team
+    attributes.year = document.getElementById('trade-in-year')?.value || null;  // Shirt year
   } else if (type === 'coin') {
-    attributes.denomination = document.getElementById('trade-in-denomination')?.value || null;
-    attributes.year_minted = document.getElementById('trade-in-year_minted')?.value || null;
+    attributes.denomination = document.getElementById('trade-in-denomination')?.value || null;  // Coin denomination
+    attributes.year_minted = document.getElementById('trade-in-year_minted')?.value || null;  // Coin year minted
   }
 
   const tradeInItem = {
-    id: Date.now().toString(), // Unique ID based on current time
-    type,
-    name: document.getElementById('trade-in-name').value,
-    price: parseFloat(document.getElementById('trade-in-price').value) || 0,
-    tradeValue: parseFloat(document.getElementById('trade-in-value').value) || 0,
-    condition: condition || null,
-    image_url: document.getElementById('trade-in-image-url').value || null,
-    attributes,
-    role: 'trade_in' // Trade-in item from customer
+    id: Date.now().toString(),  // Generates unique ID based on current timestamp
+    type,  // Item type from selector
+    name: document.getElementById('trade-in-name').value,  // Item name from input
+    price: parseFloat(document.getElementById('trade-in-price').value) || 0,  // Market price, defaults to 0 if invalid
+    tradeValue: parseFloat(document.getElementById('trade-in-value').value) || 0,  // Trade value, defaults to 0 if invalid
+    condition: condition || null,  // Combined condition or null if empty
+    image_url: document.getElementById('trade-in-image-url').value || null,  // Image URL or null
+    attributes,  // Type-specific attributes
+    role: 'trade_in'  // Marks item as a trade-in from customer
   };
-  tradeInCart.push(tradeInItem);
-  console.log('Adding to trade-in cart:', tradeInItem);
-  render(tradeOutPage, tradeOutSearchTerm, tradeInCart, tradeOutCart);
+  tradeInCart.push(tradeInItem);  // Adds item to tradeInCart array
+  console.log('Adding to trade-in cart:', tradeInItem);  // Logs added item
+  render(tradeOutPage, tradeOutSearchTerm, tradeInCart, tradeOutCart);  // Refreshes UI with updated carts (Note: assumes tradeOutPage, tradeOutSearchTerm are global)
 }
 
 // Adds an item from inventory to the trade-out cart
 function addToTradeOutCart(id, name, price, image_url, card_set, condition) {
-  console.log('Adding to trade-out cart:', { id, name, price, image_url, card_set, condition });
-  tradeOutCart.push({ id, name, price, image_url: decodeURIComponent(image_url), card_set, condition, role: 'trade_out' });
-  fetchInventory(tradeOutPage, tradeOutSearchTerm);
+  console.log('Adding to trade-out cart:', { id, name, price, image_url, card_set, condition });  // Logs item being added
+  tradeOutCart.push({ 
+    id,  // Item ID from inventory
+    name,  // Item name
+    price,  // Original price
+    image_url: decodeURIComponent(image_url),  // Decoded image URL
+    card_set,  // Card set (assumes TCG context, may need type check)
+    condition,  // Item condition
+    role: 'trade_out'  // Marks item as trade-out to customer
+  });
+  fetchInventory(tradeOutPage, tradeOutSearchTerm);  // Refreshes Trade tab (Note: assumes global vars)
 }
 
 // Updates the negotiated price for an item in the trade-out cart
 function updateTradeOutPrice(id, value) {
-  const index = tradeOutCart.findIndex(item => item.id === id);
+  const index = tradeOutCart.findIndex(item => item.id === id);  // Finds item index in tradeOutCart by ID
   if (index !== -1) {
-    tradeOutCart[index].negotiatedPrice = parseFloat(value) || tradeOutCart[index].price;
-    console.log('Updated trade-out price:', tradeOutCart[index]);
+    tradeOutCart[index].negotiatedPrice = parseFloat(value) || tradeOutCart[index].price;  // Updates negotiated price, falls back to original if invalid
+    console.log('Updated trade-out price:', tradeOutCart[index]);  // Logs updated item
   }
-  fetchInventory(tradeOutPage, tradeOutSearchTerm);
+  fetchInventory(tradeOutPage, tradeOutSearchTerm);  // Refreshes Trade tab (Note: assumes global vars)
 }
 
-// Completes the trade transaction, sending carts to main process
+// Completes the trade transaction, sending carts to the main process
 function completeTradeTransaction() {
-  console.log('Completing trade transaction:', { tradeInCart, tradeOutCart });
-  const items = [...tradeInCart, ...tradeOutCart];
-  const cashIn = tradeOutCart.reduce((sum, item) => sum + parseFloat(item.negotiatedPrice || item.price), 0); // Total customer pays
-  const cashOut = tradeInCart.reduce((sum, item) => sum + parseFloat(item.tradeValue), 0); // Total store pays
+  console.log('Completing trade transaction:', { tradeInCart, tradeOutCart });  // Logs transaction start
+  const items = [...tradeInCart, ...tradeOutCart];  // Combines trade-in and trade-out items
+  const cashIn = tradeOutCart.reduce((sum, item) => sum + parseFloat(item.negotiatedPrice || item.price), 0);  // Total cash received from customer
+  const cashOut = tradeInCart.reduce((sum, item) => sum + parseFloat(item.tradeValue), 0);  // Total cash paid to customer
   
   tradeInCart.forEach(item => {
-    const itemData = { ...item, ...item.attributes };
-    ipcRenderer.send('add-item', itemData); // Add trade-in items to inventory
+    const itemData = { ...item, ...item.attributes };  // Merges item data with its attributes
+    ipcRenderer.send('add-item', itemData);  // Sends trade-in items to main process for inventory addition
   });
   
-  ipcRenderer.send('complete-transaction', { items, type: 'trade', cashIn, cashOut });
+  ipcRenderer.send('complete-transaction', { items, type: 'trade', cashIn, cashOut });  // Sends transaction data to main process
   ipcRenderer.once('transaction-complete', (event, data) => {
-    console.log('Trade transaction completed');
-    tradeInCart.length = 0; // Clear trade-in cart
-    tradeOutCart.length = 0; // Clear trade-out cart
-    require('../renderer').showScreen('trade'); // Reload Trade screen
+    console.log('Trade transaction completed');  // Logs successful completion
+    tradeInCart.length = 0;  // Clears trade-in cart
+    tradeOutCart.length = 0;  // Clears trade-out cart
+    require('../renderer').showScreen('trade');  // Reloads the Trade screen
   });
-  ipcRenderer.once('transaction-error', (event, error) => console.error('Trade transaction failed:', error));
+  ipcRenderer.once('transaction-error', (event, error) => console.error('Trade transaction failed:', error));  // Logs any transaction errors
 }
 
-// Clears the trade-in cart
+// Clears the trade-in cart and refreshes the UI
 function clearTradeInCart() {
-  tradeInCart.length = 0; // Empty trade-in cart
-  fetchInventory(tradeOutPage, tradeOutSearchTerm);
+  tradeInCart.length = 0;  // Empties the tradeInCart array
+  fetchInventory(tradeOutPage, tradeOutSearchTerm);  // Refreshes UI (Note: assumes global vars)
 }
 
-// Clears the trade-out cart
+// Clears the trade-out cart and refreshes the UI
 function clearTradeOutCart() {
-  tradeOutCart.length = 0; // Empty trade-out cart
-  fetchInventory(tradeOutPage, tradeOutSearchTerm);
+  tradeOutCart.length = 0;  // Empties the tradeOutCart array
+  fetchInventory(tradeOutPage, tradeOutSearchTerm);  // Refreshes UI (Note: assumes global vars)
 }
 
 // Updates attribute fields in the trade-in form based on item type
 function updateAttributeFields(context) {
-  const type = document.getElementById(`${context}-type-selector`).value;
-  const attributesDiv = document.getElementById(`${context}-attributes`);
-  const tcgFetchDiv = document.getElementById(`${context}-tcg-fetch`);
-  const gameFetchDiv = document.getElementById(`${context}-game-fetch`);
-  attributesDiv.innerHTML = ''; // Clear existing attributes
-  if (tcgFetchDiv) tcgFetchDiv.style.display = (type === 'pokemon_tcg' || type === 'other_tcg') ? 'block' : 'none';
-  if (gameFetchDiv) gameFetchDiv.style.display = (type === 'video_game') ? 'block' : 'none';
+  const type = document.getElementById(`${context}-type-selector`).value;  // Gets selected item type
+  const attributesDiv = document.getElementById(`${context}-attributes`);  // Gets attributes container
+  const tcgFetchDiv = document.getElementById(`${context}-tcg-fetch`);  // Gets TCG fetch section
+  const gameFetchDiv = document.getElementById(`${context}-game-fetch`);  // Gets game fetch section
+  attributesDiv.innerHTML = '';  // Clears existing attributes
+  if (tcgFetchDiv) tcgFetchDiv.style.display = (type === 'pokemon_tcg' || type === 'other_tcg') ? 'block' : 'none';  // Shows TCG fetch for TCG types
+  if (gameFetchDiv) gameFetchDiv.style.display = (type === 'video_game') ? 'block' : 'none';  // Shows game fetch for video games
 
-  // Add specific fields based on item type
+  // Adds type-specific attribute fields to the form
   if (type === 'pokemon_tcg' || type === 'other_tcg') {
     attributesDiv.innerHTML = `
       <input id="${context}-tcg_id" type="hidden">
       <input id="${context}-card_set" type="hidden">
       <input id="${context}-rarity" type="hidden">
-    `;
+    `;  // Hidden fields for TCG attributes
   } else if (type === 'video_game') {
     attributesDiv.innerHTML = `
       <div class="input-group">
         <label>Platform</label>
         <input id="${context}-platform" placeholder="e.g., PS4" type="text">
       </div>
-    `;
+    `;  // Platform field for video games
   } else if (type === 'console') {
     attributesDiv.innerHTML = `
       <div class="input-group">
@@ -470,7 +483,7 @@ function updateAttributeFields(context) {
         <label>Name</label>
         <input id="${context}-name" placeholder="Enter item name" type="text">
       </div>
-    `;
+    `;  // Brand, model, and name fields for consoles
   } else if (type === 'football_shirt') {
     attributesDiv.innerHTML = `
       <div class="input-group">
@@ -481,7 +494,7 @@ function updateAttributeFields(context) {
         <label>Year</label>
         <input id="${context}-year" placeholder="e.g., 2023" type="text">
       </div>
-    `;
+    `;  // Team and year fields for football shirts
   } else if (type === 'coin') {
     attributesDiv.innerHTML = `
       <div class="input-group">
@@ -492,32 +505,34 @@ function updateAttributeFields(context) {
         <label>Year Minted</label>
         <input id="${context}-year_minted" placeholder="e.g., 1969" type="text">
       </div>
-    `;
+    `;  // Denomination and year minted fields for coins
   }
 }
 
 // Updates condition options in the trade-in form dropdown
 function updateConditionOptions(context) {
-  const type = document.getElementById(`${context}-type-selector`).value;
-  const conditionSelect = document.getElementById(`${context}-condition-category`);
-  conditionSelect.innerHTML = '<option value="">Select Condition</option>'; // Clear existing options
+  const type = document.getElementById(`${context}-type-selector`).value;  // Gets selected item type
+  const conditionSelect = document.getElementById(`${context}-condition-category`);  // Gets condition dropdown
+  conditionSelect.innerHTML = '<option value="">Select Condition</option>';  // Sets default empty option
 
+  // Defines condition options for each item type
   const options = {
-    'pokemon_tcg': ['Raw', 'PSA', 'CGC', 'BGS', 'TAG', 'Other'], // TCG-specific conditions
-    'other_tcg': ['Raw', 'PSA', 'CGC', 'BGS', 'TAG', 'Other'], // TCG-specific conditions
-    'video_game': ['New', 'Used', 'CIB', 'Loose', 'Graded'],
-    'console': ['New', 'Used', 'Refurbished', 'Broken'], // Tech-specific conditions
-    'football_shirt': ['New', 'Worn', 'Signed', 'Game-Worn'],
-    'coin': ['Uncirculated', 'Circulated', 'Proof', 'Graded']
-  }[type] || [];
+    'pokemon_tcg': ['Raw', 'PSA', 'CGC', 'BGS', 'TAG', 'Other'],  // TCG-specific conditions
+    'other_tcg': ['Raw', 'PSA', 'CGC', 'BGS', 'TAG', 'Other'],  // Other TCG conditions
+    'video_game': ['New', 'Used', 'CIB', 'Loose', 'Graded'],  // Video game conditions
+    'console': ['New', 'Used', 'Refurbished', 'Broken'],  // Console conditions
+    'football_shirt': ['New', 'Worn', 'Signed', 'Game-Worn'],  // Football shirt conditions
+    'coin': ['Uncirculated', 'Circulated', 'Proof', 'Graded']  // Coin conditions
+  }[type] || [];  // Gets options for type or empty array if none match
 
-  // Populate condition options
+  // Populates condition dropdown with options
   options.forEach(option => {
     const opt = document.createElement('option');
     opt.value = option;
     opt.text = option;
-    conditionSelect.appendChild(opt);
+    conditionSelect.appendChild(opt);  // Adds each option to dropdown
   });
 }
 
+// Exports functions for use in other modules or main process
 module.exports = { render, fetchTcgCard, selectTcgCard, closeTcgModal, addToTradeInCart, addToTradeOutCart, updateTradeOutPrice, completeTradeTransaction, clearTradeInCart, clearTradeOutCart, updateAttributeFields };

@@ -1,454 +1,457 @@
 /* Reset and Base Styles */
 * {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-  }
-  
-  body {
-    background-color: #1E2124; /* Darker gray */
-    color: #DCDDDE; /* Soft white */
-    font-family: 'Segoe UI', Arial, sans-serif;
-    font-size: 14px;
-    display: flex;
-  }
-  
-  /* Sidebar */
-  #sidebar {
-    width: 200px;
-    background-color: #2C2F33;
-    padding: 20px;
-    height: 100vh;
-    position: fixed;
-    top: 0;
-    left: 0;
-    display: flex; /* Add flexbox for vertical layout */
-    flex-direction: column; /* Stack buttons vertically */
-  }
-  
-  .sidebar h2 {
-    color: #FFFFFF;
-    font-size: 24px;
-    margin-bottom: 30px;
-  }
-  
-  #sidebar button {
-    display: block; /* Force block-level for vertical stacking */
-    width: 100%; /* Full width of sidebar */
-    padding: 10px;
-    margin-bottom: 10px; /* Space between buttons */
-    background-color: #7289DA;
-    color: #FFFFFF;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    text-align: left; /* Align text for readability */
-  }
-  
-  #sidebar button:hover {
-    background-color: #677BC4;
-  }
-  
-  /* Main Content */
-  .main-content {
-    margin-left: 200px;
-    padding: 20px;
-    flex-grow: 1;
-  }
+  margin: 0;  /* Removes default margins from all elements */
+  padding: 0;  /* Removes default padding from all elements */
+  box-sizing: border-box;  /* Ensures padding and borders are included in element dimensions */
+}
 
-  /* Ensure content stays to the right of sidebar */
-    #content {
-    margin-left: 220px; /* Match sidebar width + padding */
-    padding: 20px;
-    flex-grow: 1;
-  }
-  
-  /* Headings */
-  h3, h4 {
-    color: #FFFFFF;
-    margin-bottom: 15px;
-  }
-  
-  /* Inputs and Selects */
-  input[type="text"], input[type="number"], select {
-    background-color: #2C2F33;
-    color: #DCDDDE;
-    border: 1px solid #40444B;
-    padding: 10px;
-    margin: 5px 0;
-    border-radius: 4px;
-    width: 250px;
-  }
-  
-  input[type="file"] {
-    color: #DCDDDE;
-  }
-  
-  /* Search Bar */
-  input[type="text"][id$="-search"] {
-    width: 400px;
-    padding-left: 35px;
-    background: #2C2F33 url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="%23DCDDDE" viewBox="0 0 16 16"><path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/></svg>') no-repeat 10px center;
-  }
-  
-  /* Buttons */
-  button {
-    background-color: #7289DA;
-    color: #FFFFFF;
-    border: none;
-    padding: 10px 20px;
-    margin: 5px 0;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: background-color 0.2s;
-  }
-  
-  button:hover {
-    background-color: #5B6EAE;
-  }
-  
-  button:disabled {
-    background-color: #4B5EAA;
-    cursor: not-allowed;
-  }
-  
-  /* Lists (Inventory and Carts) */
-  ul {
-    list-style: none;
-    margin: 10px 0;
-  }
-  
-  ul li {
-    background-color: #35393F;
-    padding: 15px;
-    margin: 8px 0;
-    border-radius: 6px;
-    display: flex;
-    align-items: center;
-    gap: 15px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-  }
-  
-  ul li img {
-    max-width: 60px;
-    border-radius: 4px;
-  }
-  
-  ul li:hover {
-    background-color: #40444B;
-  }
-  
-  /* Modal */
-  div[style*="position: fixed"] {
-    background: rgba(0, 0, 0, 0.85) !important;
-  }
-  
-  div[style*="background: white"] {
-    background-color: #2C2F33 !important;
-    border: 1px solid #40444B;
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-    max-width: 90%;
-  }
-  
-  div[style*="display: flex"] {
-    flex-wrap: wrap;
-    gap: 20px;
-  }
-  
-  /* Modal Card */
-  #tcg-card-list-buy div, #tcg-card-list-trade-in div {
-    background-color: #35393F;
-    border: 1px solid #40444B;
-    padding: 15px;
-    border-radius: 6px;
-    text-align: center;
-    width: 220px;
-  }
-  
-  #tcg-card-list-buy div:hover, #tcg-card-list-trade-in div:hover {
-    background-color: #40444B;
-  }
-  
-  /* Pagination */
-  div[style*="button"] {
-    margin-top: 15px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-  
-  span {
-    color: #DCDDDE;
-  }
-  
-  /* Text */
-  p {
-    color: #BABDCA; /* Softer gray */
-    margin: 5px 0;
-  }
+body {
+  background-color: #1E2124; /* Sets dark gray background for the entire app */
+  color: #DCDDDE; /* Sets soft white text color for readability on dark background */
+  font-family: 'Segoe UI', Arial, sans-serif;  /* Defines fallback font stack */
+  font-size: 14px;  /* Sets base font size */
+  display: flex;  /* Enables flexbox layout for body content */
+}
 
-  /* Sections */
+/* Sidebar */
+#sidebar {
+  width: 200px;  /* Sets fixed width for sidebar */
+  background-color: #2C2F33;  /* Darker gray background for sidebar */
+  padding: 20px;  /* Adds internal spacing */
+  height: 100vh;  /* Makes sidebar full viewport height */
+  position: fixed;  /* Fixes sidebar to the left side of the screen */
+  top: 0;  /* Aligns sidebar to the top */
+  left: 0;  /* Aligns sidebar to the left */
+  display: flex;  /* Enables flexbox for vertical button layout */
+  flex-direction: column;  /* Stacks buttons vertically */
+}
+
+/* Note: .sidebar h2 is defined but not used in index.html */
+.sidebar h2 {
+  color: #FFFFFF;  /* White text for sidebar heading */
+  font-size: 24px;  /* Larger font size for heading */
+  margin-bottom: 30px;  /* Space below heading */
+}
+
+#sidebar button {
+  display: block;  /* Forces buttons to be block-level for full width */
+  width: 100%;  /* Ensures buttons span sidebar width */
+  padding: 10px;  /* Adds internal padding to buttons */
+  margin-bottom: 10px;  /* Adds space between buttons */
+  background-color: #7289DA;  /* Discord-like blue background for buttons */
+  color: #FFFFFF;  /* White text color */
+  border: none;  /* Removes button borders */
+  border-radius: 4px;  /* Rounds button corners */
+  cursor: pointer;  /* Shows pointer on hover for interactivity */
+  text-align: left;  /* Aligns button text to the left */
+}
+
+#sidebar button:hover {
+  background-color: #677BC4;  /* Slightly darker blue on hover */
+}
+
+/* Main Content */
+.main-content {
+  margin-left: 200px;  /* Offsets content to avoid overlapping sidebar */
+  padding: 20px;  /* Adds internal padding */
+  flex-grow: 1;  /* Allows content to expand and fill available space */
+}
+
+/* Ensures content stays to the right of sidebar */
+#content {
+  margin-left: 220px;  /* Matches sidebar width (200px) plus padding (20px) */
+  padding: 20px;  /* Adds internal padding */
+  flex-grow: 1;  /* Allows content to expand and fill available space */
+}
+
+/* Headings */
+h3, h4 {
+  color: #FFFFFF;  /* White text for headings */
+  margin-bottom: 15px;  /* Adds space below headings */
+}
+
+/* Inputs and Selects */
+input[type="text"], input[type="number"], select {
+  background-color: #2C2F33;  /* Dark gray background for inputs */
+  color: #DCDDDE;  /* Soft white text color */
+  border: 1px solid #40444B;  /* Subtle gray border */
+  padding: 10px;  /* Adds internal padding */
+  margin: 5px 0;  /* Adds vertical spacing */
+  border-radius: 4px;  /* Rounds corners */
+  width: 250px;  /* Sets default width */
+}
+
+input[type="file"] {
+  color: #DCDDDE;  /* Soft white text for file inputs */
+}
+
+/* Search Bar */
+input[type="text"][id$="-search"] {
+  width: 400px;  /* Wider width for search inputs */
+  padding-left: 35px;  /* Adds padding for search icon */
+  background: #2C2F33 url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="%23DCDDDE" viewBox="0 0 16 16"><path d="M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398h-.001c.03.04.062.078.098.115l3.85 3.85a1 1 0 0 0 1.415-1.414l-3.85-3.85a1.007 1.007 0 0 0-.115-.1zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z"/></svg>') no-repeat 10px center;  /* Adds inline SVG search icon */
+}
+
+/* Buttons */
+button {
+  background-color: #7289DA;  /* Default blue background for buttons */
+  color: #FFFFFF;  /* White text color */
+  border: none;  /* Removes borders */
+  padding: 10px 20px;  /* Adds padding */
+  margin: 5px 0;  /* Adds vertical spacing */
+  border-radius: 6px;  /* Rounds corners slightly more than inputs */
+  cursor: pointer;  /* Shows pointer on hover */
+  transition: background-color 0.2s;  /* Smooth background color transition on hover */
+}
+
+button:hover {
+  background-color: #5B6EAE;  /* Darker blue on hover */
+}
+
+button:disabled {
+  background-color: #4B5EAA;  /* Even darker blue for disabled state */
+  cursor: not-allowed;  /* Shows not-allowed cursor */
+}
+
+/* Lists (Inventory and Carts) */
+ul {
+  list-style: none;  /* Removes default list bullets */
+  margin: 10px 0;  /* Adds vertical spacing */
+}
+
+ul li {
+  background-color: #35393F;  /* Slightly lighter gray background for list items */
+  padding: 15px;  /* Adds internal padding */
+  margin: 8px 0;  /* Adds vertical spacing between items */
+  border-radius: 6px;  /* Rounds corners */
+  display: flex;  /* Enables flexbox for item layout */
+  align-items: center;  /* Centers items vertically */
+  gap: 15px;  /* Adds space between flex children */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);  /* Adds subtle shadow for depth */
+}
+
+ul li img {
+  max-width: 60px;  /* Limits image width */
+  border-radius: 4px;  /* Rounds image corners */
+}
+
+ul li:hover {
+  background-color: #40444B;  /* Slightly darker gray on hover */
+}
+
+/* Modal */
+div[style*="position: fixed"] {
+  background: rgba(0, 0, 0, 0.85) !important;  /* Darker semi-transparent overlay for modals */
+}
+
+div[style*="background: white"] {
+  background-color: #2C2F33 !important;  /* Overrides inline white background with dark gray */
+  border: 1px solid #40444B;  /* Adds subtle border */
+  border-radius: 8px;  /* Rounds corners more than buttons */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);  /* Adds stronger shadow for modal pop-out effect */
+  max-width: 90%;  /* Limits modal width */
+}
+
+div[style*="display: flex"] {
+  flex-wrap: wrap;  /* Allows flex items to wrap */
+  gap: 20px;  /* Adds space between flex children */
+}
+
+/* Modal Card */
+#tcg-card-list-buy div, #tcg-card-list-trade-in div {
+  background-color: #35393F;  /* Light gray background for TCG card items */
+  border: 1px solid #40444B;  /* Subtle border */
+  padding: 15px;  /* Adds internal padding */
+  border-radius: 6px;  /* Rounds corners */
+  text-align: center;  /* Centers text */
+  width: 220px;  /* Fixed width for consistency */
+}
+
+#tcg-card-list-buy div:hover, #tcg-card-list-trade-in div:hover {
+  background-color: #40444B;  /* Darker gray on hover */
+}
+
+/* Pagination */
+div[style*="button"] {
+  margin-top: 15px;  /* Adds space above pagination */
+  display: flex;  /* Enables flexbox for pagination layout */
+  align-items: center;  /* Centers items vertically */
+  gap: 10px;  /* Adds space between buttons and text */
+}
+
+span {
+  color: #DCDDDE;  /* Soft white text for spans (e.g., page numbers) */
+}
+
+/* Text */
+p {
+  color: #BABDCA; /* Softer gray text for paragraphs */
+  margin: 5px 0;  /* Adds vertical spacing */
+}
+
+/* Sections */
 .section {
-    background-color: #35393F;
-    padding: 20px;
-    margin-bottom: 20px;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-  }
+  background-color: #35393F;  /* Light gray background for sections */
+  padding: 20px;  /* Adds internal padding */
+  margin-bottom: 20px;  /* Adds space below sections */
+  border-radius: 8px;  /* Rounds corners */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);  /* Adds subtle shadow */
+}
 
+/* Clear buttons within sections */
 .section button[onclick^="clear"] {
-    background-color: #DA7272; /* Reddish for clear */
-    color: #FFFFFF;
-    border: none;
-    padding: 8px 16px;
-    border-radius: 4px;
-    cursor: pointer;
-    margin-left: 10px;
+  background-color: #DA7272; /* Reddish background for clear buttons */
+  color: #FFFFFF;  /* White text */
+  border: none;  /* Removes borders */
+  padding: 8px 16px;  /* Slightly smaller padding than default buttons */
+  border-radius: 4px;  /* Rounds corners */
+  cursor: pointer;  /* Shows pointer on hover */
+  margin-left: 10px;  /* Adds space from other elements */
 }
-  
+
 .section button[onclick^="clear"]:hover {
-    background-color: #AE5B5B;
+  background-color: #AE5B5B;  /* Darker red on hover */
 }
-  
-  /* Input Groups */
-  .input-group {
-    margin-bottom: 15px;
-  }
-  
-  .input-group label {
-    display: block;
-    color: #FFFFFF;
-    margin-bottom: 5px;
-    font-weight: bold;
-  }
-  
-  .input-group select, .input-group input[type="text"], .input-group input[type="number"] {
-    width: 100%;
-    max-width: 300px;
-  }
-  
-  .input-group button {
-    margin-left: 10px;
-  }
-  
-  /* Cart Section */
-  .section ul {
-    margin-top: 15px;
-  }
 
-  /* Trade Container */
+/* Input Groups */
+.input-group {
+  margin-bottom: 15px;  /* Adds space below input groups */
+}
+
+.input-group label {
+  display: block;  /* Ensures labels take full width */
+  color: #FFFFFF;  /* White text for labels */
+  margin-bottom: 5px;  /* Adds space below labels */
+  font-weight: bold;  /* Makes labels bold */
+}
+
+.input-group select, .input-group input[type="text"], .input-group input[type="number"] {
+  width: 100%;  /* Full width within input group */
+  max-width: 300px;  /* Caps width for consistency */
+}
+
+.input-group button {
+  margin-left: 10px;  /* Adds space between inputs and buttons */
+}
+
+/* Cart Section */
+.section ul {
+  margin-top: 15px;  /* Adds space above lists within sections */
+}
+
+/* Trade Container */
 .trade-container {
-    display: flex;
-    gap: 20px;
-    height: calc(100vh - 40px); /* Full height minus padding */
-  }
-  
-  /* Trade Sections */
-  .trade-section {
-    flex: 1;
-    overflow-y: auto; /* Scroll if content overflows */
-  }
-  
-  .trade-in, .trade-out {
-    padding: 10px;
-  }
-  
-  .trade-in .section, .trade-out .section {
-    margin-bottom: 20px;
-  }
-  
-  /* Adjust Inputs for Trade-In */
-  .trade-in .input-group input, .trade-in .input-group select {
-    max-width: 250px;
-  }
-  
-  /* Trade-Out Inventory */
-  .trade-out #trade-out-search {
-    width: 100%;
-    max-width: 400px;
-  }
+  display: flex;  /* Enables flexbox for trade layout */
+  gap: 20px;  /* Adds space between trade sections */
+  height: calc(100vh - 40px); /* Sets height to full viewport minus padding */
+}
 
-  /* Transactions Table */
+/* Trade Sections */
+.trade-section {
+  flex: 1;  /* Allows sections to grow equally */
+  overflow-y: auto; /* Adds vertical scroll if content overflows */
+}
+
+.trade-in, .trade-out {
+  padding: 10px;  /* Adds internal padding */
+}
+
+.trade-in .section, .trade-out .section {
+  margin-bottom: 20px;  /* Adds space below sections */
+}
+
+/* Adjusts Inputs for Trade-In */
+.trade-in .input-group input, .trade-in .input-group select {
+  max-width: 250px;  /* Slightly narrower inputs for trade-in form */
+}
+
+/* Trade-Out Inventory */
+.trade-out #trade-out-search {
+  width: 100%;  /* Full width for search input */
+  max-width: 400px;  /* Caps width for consistency */
+}
+
+/* Transactions Table */
 .transactions-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 15px;
-    background-color: #35393F;
-    border-radius: 6px;
-    overflow: hidden;
-  }
-  
-  .transactions-table th,
-  .transactions-table td {
-    padding: 12px;
-    text-align: left;
-    border-bottom: 1px solid #40444B;
-  }
-  
-  .transactions-table th {
-    background-color: #2C2F33;
-    color: #FFFFFF;
-    cursor: pointer;
-    user-select: none;
-  }
-  
-  .transactions-table th.asc::after {
-    content: '\2191'; /* Unicode for ↑ */
-  }
-  
-  .transactions-table th:not(.asc)::after {
-    content: '\2193'; /* Unicode for ↓ */
-  }
-  
-  .transactions-table tr:hover {
-    background-color: #40444B;
-  }
-  
-  .transactions-table .items-list {
-    margin: 10px 0 0 20px;
-    padding: 0;
-  }
-  
-  .transactions-table .toggle-items {
-    background-color: #7289DA;
-    color: #FFFFFF;
-    border: none;
-    padding: 6px 12px;
-    border-radius: 4px;
-    cursor: pointer;
-  }
-  
-  .transactions-table .toggle-items:hover {
-    background-color: #5B6EAE;
-  }
+  width: 100%;  /* Full width table */
+  border-collapse: collapse;  /* Removes spacing between cells */
+  margin-top: 15px;  /* Adds space above table */
+  background-color: #35393F;  /* Light gray background */
+  border-radius: 6px;  /* Rounds corners */
+  overflow: hidden;  /* Ensures content respects border radius */
+}
 
-  .transactions-table + .input-group {
-    margin-bottom: 15px;
-  }
-  
-  .transactions-table + .input-group label {
-    display: block;
-    color: #FFFFFF;
-    margin-bottom: 5px;
-    font-weight: bold;
-  }
-  
-  .transactions-table + .input-group input {
-    width: 100%;
-    max-width: 400px;
-  }
+.transactions-table th,
+.transactions-table td {
+  padding: 12px;  /* Adds internal padding */
+  text-align: left;  /* Aligns text to the left */
+  border-bottom: 1px solid #40444B;  /* Adds subtle horizontal lines */
+}
 
-  .transactions-table + .pagination {
-    margin-top: 15px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-  
-  .transactions-table + .pagination button {
-    background-color: #7289DA;
-    color: #FFFFFF;
-    border: none;
-    padding: 8px 16px;
-    border-radius: 4px;
-    cursor: pointer;
-  }
-  
-  .transactions-table + .pagination button:hover {
-    background-color: #5B6EAE;
-  }
-  
-  .transactions-table + .pagination button:disabled {
-    background-color: #4B5EAA;
-    cursor: not-allowed;
-  }
-  
-  .transactions-table + .input-group input[type="date"] {
-    background-color: #2C2F33;
-    color: #DCDDDE;
-    border: 1px solid #40444B;
-    padding: 8px;
-    border-radius: 4px;
-    width: 150px;
-  }
+.transactions-table th {
+  background-color: #2C2F33;  /* Darker gray for headers */
+  color: #FFFFFF;  /* White text */
+  cursor: pointer;  /* Shows pointer for sortable headers */
+  user-select: none;  /* Prevents text selection on headers */
+}
 
-  .transactions-table tr.sell {
-    background-color: #2E4F33; /* Dark green for sell */
-  }
-  
-  .transactions-table tr.buy {
-    background-color: #4F2E2E; /* Dark red for buy */
-  }
-  
-  .transactions-table tr.trade {
-    background-color: #2E3B4F; /* Dark blue for trade */
-  }
-  
-  .transactions-table tr.sell:hover,
-  .transactions-table tr.buy:hover,
-  .transactions-table tr.trade:hover {
-    background-color: #40444B; /* Consistent hover */
-  }
+.transactions-table th.asc::after {
+  content: '\2191'; /* Adds upward arrow (↑) for ascending sort */
+}
 
-  /* Inventory Table */
+.transactions-table th:not(.asc)::after {
+  content: '\2193'; /* Adds downward arrow (↓) for descending/default sort */
+}
 
-  .inventory-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 20px;
-  }
-  
-  .inventory-table th, .inventory-table td {
-    border: 1px solid #ccc;
-    padding: 8px;
-    text-align: left;
-  }
-  
-  .inventory-table th {
-    background-color: #2C2F33;
-    cursor: pointer;
-  }
-  
-  .inventory-table th:hover {
-    background-color: #40444B;
-  }
-  
-  .inventory-table th.asc::after {
-    content: '\2191'; /* Unicode ↑ */
-  }
-  
-  .inventory-table th:not(.asc)::after {
-    content: '\2193'; /* Unicode ↓ */
-  }
-  
-  .inventory-table input:disabled {
-    background-color: #2C2F33;
-    border: none;
-    color: #FFFFFF;
-  }
-  
-  .inventory-table input:not(:disabled) {
-    background-color: #FFFFFF;
-    border: 1px solid #ccc;
-    color: #000000;
-  }
-  
-/* Reports table */
+.transactions-table tr:hover {
+  background-color: #40444B;  /* Darker gray on row hover */
+}
 
-  .reconciliations-table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-top: 20px;
-  }
-  
-  .reconciliations-table th,
-  .reconciliations-table td {
-    border: 1px solid #ccc;
-    padding: 8px;
-    text-align: left;
-  }
-  
-  .reconciliations-table th {
-    background-color: #2C2F33;
-  }
+.transactions-table .items-list {
+  margin: 10px 0 0 20px;  /* Positions item list with indent */
+  padding: 0;  /* Removes default padding */
+}
+
+.transactions-table .toggle-items {
+  background-color: #7289DA;  /* Blue background for toggle buttons */
+  color: #FFFFFF;  /* White text */
+  border: none;  /* Removes borders */
+  padding: 6px 12px;  /* Smaller padding than default buttons */
+  border-radius: 4px;  /* Rounds corners */
+  cursor: pointer;  /* Shows pointer on hover */
+}
+
+.transactions-table .toggle-items:hover {
+  background-color: #5B6EAE;  /* Darker blue on hover */
+}
+
+/* Input group adjustments after transactions table */
+.transactions-table + .input-group {
+  margin-bottom: 15px;  /* Adds space below input group */
+}
+
+.transactions-table + .input-group label {
+  display: block;  /* Ensures labels take full width */
+  color: #FFFFFF;  /* White text */
+  margin-bottom: 5px;  /* Adds space below labels */
+  font-weight: bold;  /* Makes labels bold */
+}
+
+.transactions-table + .input-group input {
+  width: 100%;  /* Full width within group */
+  max-width: 400px;  /* Caps width for consistency */
+}
+
+/* Pagination adjustments after transactions table */
+.transactions-table + .pagination {
+  margin-top: 15px;  /* Adds space above pagination */
+  display: flex;  /* Enables flexbox for layout */
+  align-items: center;  /* Centers items vertically */
+  gap: 10px;  /* Adds space between elements */
+}
+
+.transactions-table + .pagination button {
+  background-color: #7289DA;  /* Blue background for buttons */
+  color: #FFFFFF;  /* White text */
+  border: none;  /* Removes borders */
+  padding: 8px 16px;  /* Adds padding */
+  border-radius: 4px;  /* Rounds corners */
+  cursor: pointer;  /* Shows pointer on hover */
+}
+
+.transactions-table + .pagination button:hover {
+  background-color: #5B6EAE;  /* Darker blue on hover */
+}
+
+.transactions-table + .pagination button:disabled {
+  background-color: #4B5EAA;  /* Even darker blue for disabled state */
+  cursor: not-allowed;  /* Shows not-allowed cursor */
+}
+
+.transactions-table + .input-group input[type="date"] {
+  background-color: #2C2F33;  /* Dark gray background for date inputs */
+  color: #DCDDDE;  /* Soft white text */
+  border: 1px solid #40444B;  /* Subtle border */
+  padding: 8px;  /* Adds padding */
+  border-radius: 4px;  /* Rounds corners */
+  width: 150px;  /* Smaller width for date inputs */
+}
+
+/* Transaction row color coding */
+.transactions-table tr.sell {
+  background-color: #2E4F33; /* Dark green for sell rows */
+}
+
+.transactions-table tr.buy {
+  background-color: #4F2E2E; /* Dark red for buy rows */
+}
+
+.transactions-table tr.trade {
+  background-color: #2E3B4F; /* Dark blue for trade rows */
+}
+
+.transactions-table tr.sell:hover,
+.transactions-table tr.buy:hover,
+.transactions-table tr.trade:hover {
+  background-color: #40444B; /* Consistent hover color overrides type-specific colors */
+}
+
+/* Inventory Table */
+.inventory-table {
+  width: 100%;  /* Full width table */
+  border-collapse: collapse;  /* Removes spacing between cells */
+  margin-top: 20px;  /* Adds space above table */
+}
+
+.inventory-table th, .inventory-table td {
+  border: 1px solid #ccc;  /* Light gray borders for cells */
+  padding: 8px;  /* Adds internal padding */
+  text-align: left;  /* Aligns text to the left */
+}
+
+.inventory-table th {
+  background-color: #2C2F33;  /* Dark gray for headers */
+  cursor: pointer;  /* Shows pointer for sortable headers */
+}
+
+.inventory-table th:hover {
+  background-color: #40444B;  /* Darker gray on hover */
+}
+
+.inventory-table th.asc::after {
+  content: '\2191'; /* Adds upward arrow (↑) for ascending sort */
+}
+
+.inventory-table th:not(.asc)::after {
+  content: '\2193'; /* Adds downward arrow (↓) for descending/default sort */
+}
+
+.inventory-table input:disabled {
+  background-color: #2C2F33;  /* Dark gray background for disabled inputs */
+  border: none;  /* Removes borders */
+  color: #FFFFFF;  /* White text */
+}
+
+.inventory-table input:not(:disabled) {
+  background-color: #FFFFFF;  /* White background for editable inputs */
+  border: 1px solid #ccc;  /* Light gray border */
+  color: #000000;  /* Black text for contrast */
+}
+
+/* Reports Table */
+.reconciliations-table {
+  width: 100%;  /* Full width table */
+  border-collapse: collapse;  /* Removes spacing between cells */
+  margin-top: 20px;  /* Adds space above table */
+}
+
+.reconciliations-table th,
+.reconciliations-table td {
+  border: 1px solid #ccc;  /* Light gray borders for cells */
+  padding: 8px;  /* Adds internal padding */
+  text-align: left;  /* Aligns text to the left */
+}
+
+.reconciliations-table th {
+  background-color: #2C2F33;  /* Dark gray for headers */
+}

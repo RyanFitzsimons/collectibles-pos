@@ -1,29 +1,29 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <title>Collectibles POS</title>
-  <link rel="stylesheet" href="styles.css">
+<!DOCTYPE html>  <!-- Declares the document type as HTML5 -->
+<html>  <!-- Root element of the HTML document -->
+<head>  <!-- Head section containing metadata and document resources -->
+  <meta charset="UTF-8">  <!-- Sets character encoding to UTF-8 for proper text rendering -->
+  <title>Collectibles POS</title>  <!-- Sets the browser tab title to "Collectibles POS" -->
+  <link rel="stylesheet" href="styles.css">  <!-- Links to external stylesheet for CSS styling -->
 </head>
-<body>
-  <div id="sidebar">
-    <button id="sell-btn">Sell</button>
-    <button id="buy-btn">Buy</button>
-    <button id="trade-btn">Trade</button>
-    <button id="transactions-btn">Transactions</button>
-    <button id="inventory-btn">Inventory</button>
-    <button id="reports-btn">Reports</button>
+<body>  <!-- Body section containing the visible content -->
+  <div id="sidebar">  <!-- Sidebar container for navigation buttons -->
+    <button id="sell-btn">Sell</button>  <!-- Button to switch to Sell tab -->
+    <button id="buy-btn">Buy</button>  <!-- Button to switch to Buy tab -->
+    <button id="trade-btn">Trade</button>  <!-- Button to switch to Trade tab -->
+    <button id="transactions-btn">Transactions</button>  <!-- Button to switch to Transactions tab -->
+    <button id="inventory-btn">Inventory</button>  <!-- Button to switch to Inventory tab -->
+    <button id="reports-btn">Reports</button>  <!-- Button to switch to Reports tab -->
   </div>
-  <div id="content"></div>
-  <script src="renderer.js"></script>
-  <script>
+  <div id="content"></div>  <!-- Main content area where tab-specific UI is rendered -->
+  <script src="renderer.js"></script>  <!-- Loads renderer.js to handle tab rendering logic -->
+  <script>  <!-- Inline script block for adding event listeners -->
     // Add event listeners after renderer.js loads
-    document.getElementById('sell-btn').addEventListener('click', () => require('./renderer').showScreen('sell'));
-    document.getElementById('buy-btn').addEventListener('click', () => require('./renderer').showScreen('buy'));
-    document.getElementById('trade-btn').addEventListener('click', () => require('./renderer').showScreen('trade'));
-    document.getElementById('transactions-btn').addEventListener('click', () => require('./renderer').showScreen('transactions'));
-    document.getElementById('inventory-btn').addEventListener('click', () => require('./renderer').showScreen('inventory'));
-    document.getElementById('reports-btn').addEventListener('click', () => require('./renderer').showScreen('reports'));
+    document.getElementById('sell-btn').addEventListener('click', () => require('./renderer').showScreen('sell'));  // Switches to Sell tab on click
+    document.getElementById('buy-btn').addEventListener('click', () => require('./renderer').showScreen('buy'));  // Switches to Buy tab on click
+    document.getElementById('trade-btn').addEventListener('click', () => require('./renderer').showScreen('trade'));  // Switches to Trade tab on click
+    document.getElementById('transactions-btn').addEventListener('click', () => require('./renderer').showScreen('transactions'));  // Switches to Transactions tab on click
+    document.getElementById('inventory-btn').addEventListener('click', () => require('./renderer').showScreen('inventory'));  // Switches to Inventory tab on click
+    document.getElementById('reports-btn').addEventListener('click', () => require('./renderer').showScreen('reports'));  // Switches to Reports tab on click
   </script>
 </body>
 </html>
