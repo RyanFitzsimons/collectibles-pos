@@ -1,3 +1,4 @@
+// Imports
 const { ipcRenderer } = require('electron');
 const { cleanPrice } = require('../utils');
 const { buyItems } = require('../cart');

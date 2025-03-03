@@ -1,3 +1,4 @@
+// Imports
 require('dotenv').config();
 const { app, BrowserWindow, ipcMain, net, shell } = require('electron');
 const path = require('path');

@@ -1,9 +1,10 @@
+// Imports
 const { ipcRenderer } = require('electron');
 const { cleanPrice, debounce } = require('../utils');
 const { tradeInCart, tradeOutCart } = require('../cart');
-const axios = require('axios'); // Add this
-const fs = require('fs'); // Add this
-const path = require('path'); // Add this
+const axios = require('axios');
+const fs = require('fs'); 
+const path = require('path'); 
 
 function fetchInventory(page, searchTerm) {
   ipcRenderer.send('get-inventory', { page, limit: 50, search: searchTerm });
@@ -186,7 +187,6 @@ function render(page, searchTerm, inCart, outCart, inventory = null, total = nul
 
   ipcRenderer.removeAllListeners('tcg-card-data');
   ipcRenderer.on('tcg-card-data', (event, cards) => {
-    console.log('Received TCG card data for trade-in:', cards.length); // Debug
     allTcgCards = cards;
     currentTcgPage = 1;
     renderTcgModal('trade-in');
@@ -194,7 +194,6 @@ function render(page, searchTerm, inCart, outCart, inventory = null, total = nul
 
   ipcRenderer.removeAllListeners('game-data');
   ipcRenderer.on('game-data', (event, games) => {
-    console.log('Received game data for trade-in:', games.length); // Debug
     const gameList = document.getElementById('game-list-trade-in');
     if (!gameList) return console.error('Game list not found in DOM');
     gameList.innerHTML = '';
@@ -223,66 +222,6 @@ function render(page, searchTerm, inCart, outCart, inventory = null, total = nul
 
   ipcRenderer.on('tcg-card-error', (event, error) => console.error('TCG card fetch error:', error));
   ipcRenderer.on('game-data-error', (event, error) => console.error('Game data fetch error:', error));
-}
-
-function renderTcgModal(context) {
-  console.log(`Rendering TCG modal for ${context}`); // Debug
-  const modal = document.getElementById(`tcg-modal-${context}`);
-  if (!modal) {
-    console.error(`Modal #tcg-modal-${context} not found in DOM`);
-    return;
-  }
-  const cardList = document.getElementById(`tcg-card-list-${context}`);
-  const totalPages = Math.ceil(allTcgCards.length / itemsPerPage);
-  const startIndex = (currentTcgPage - 1) * itemsPerPage;
-  const paginatedCards = allTcgCards.slice(startIndex, startIndex + itemsPerPage);
-
-  cardList.innerHTML = '';
-  paginatedCards.forEach((card, index) => {
-    const cardDiv = document.createElement('div');
-    cardDiv.style = 'border: 1px solid #ccc; padding: 10px; width: 220px; text-align: center;';
-    const priceHtml = `
-      <p><strong>Prices:</strong></p>
-      ${Object.entries(card.prices.tcgplayer).map(([rarity, prices]) => `
-        <p>${rarity}: $${prices.market.toFixed(2)} (£${prices.market_gbp.toFixed(2)})</p>
-      `).join('')}
-      <p>Cardmarket Avg: €${card.prices.cardmarket.average.toFixed(2)} (£${card.prices.cardmarket.average_gbp.toFixed(2)})</p>
-    `;
-    cardDiv.innerHTML = `
-      ${card.image_url ? `<img src="${card.image_url}" alt="${card.name}" style="width: auto; height: auto; max-width: 180px; max-height: 250px;">` : 'No Image'}
-      <p><strong>${card.name}</strong></p>
-      <p>Set: ${card.card_set}</p>
-      <p>Rarity: ${card.rarity || 'N/A'}</p>
-      ${priceHtml}
-      <button class="select-tcg-card" data-index="${startIndex + index}">Select</button>
-    `;
-    cardList.appendChild(cardDiv);
-  });
-
-  document.getElementById(`tcg-page-info-${context}`).textContent = `Page ${currentTcgPage} of ${totalPages}`;
-  document.getElementById(`tcg-prev-page-${context}`).disabled = currentTcgPage === 1;
-  document.getElementById(`tcg-next-page-${context}`).disabled = currentTcgPage === totalPages;
-
-  document.getElementById(`tcg-prev-page-${context}`).onclick = () => {
-    if (currentTcgPage > 1) {
-      currentTcgPage--;
-      renderTcgModal(context);
-    }
-  };
-  document.getElementById(`tcg-next-page-${context}`).onclick = () => {
-    if (currentTcgPage < totalPages) {
-      currentTcgPage++;
-      renderTcgModal(context);
-    }
-  };
-
-  modal.style.display = 'flex';
-  document.querySelectorAll(`#tcg-card-list-${context} .select-tcg-card`).forEach(button => {
-    button.addEventListener('click', () => {
-      const index = parseInt(button.dataset.index);
-      selectTcgCard(allTcgCards[index], context);
-    });
-  });
 }
 
 function fetchTcgCard(context) {

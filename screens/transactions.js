@@ -1,3 +1,4 @@
+// Imports
 const { ipcRenderer } = require('electron');
 const { cleanPrice, debounce } = require('../utils');
 
@@ -253,6 +254,7 @@ function render() {
   });
 }
 
+// Generate receipt to txt file
 ipcRenderer.on('receipt-generated', (event, filePath) => {
   console.log('Receipt opened:', filePath);
 });

@@ -1,5 +1,6 @@
+// Imports
 const { ipcRenderer } = require('electron');
-const cart = require('./cart'); // Import cart state
+const cart = require('./cart');
 const sell = require('./screens/sell');
 const buy = require('./screens/buy');
 const trade = require('./screens/trade');
