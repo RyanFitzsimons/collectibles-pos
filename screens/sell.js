@@ -58,7 +58,8 @@ function render(page, searchTerm, cart, inventory = null, total = null) {
       <p>Total Listed: ${cleanPrice(totalListed.toFixed(2))}, Items: ${cart.length}</p>  
       <p>Total Negotiated: ${cleanPrice(totalNegotiated.toFixed(2))}</p>  
       <button id="complete-sell">Complete Sell</button> 
-      <button id="clear-sell-cart">Clear Cart</button>  
+      <button id="clear-sell-cart">Clear Cart</button>
+      <h4>Sell Cart <span class="cart-count">(${cart.length})</span></h4>  
     </div>
   `;  // Sets the HTML content for the Sell tab
 
