@@ -31,16 +31,16 @@ function render(page, searchTerm, cart, inventory = null, total = null) {
       <ul id="sell-inventory-list">
         ${inventory.map(item => `
           <li>
-            ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}">` : ''}  // Displays item image if available
+            ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}">` : ''}
             ${item.name} (${item.type}${formatAttributes(item.attributes)}) - ${cleanPrice(item.price)} (${item.condition || 'Not Set'}) 
             <button class="add-to-sell-cart" data-id="${item.id}" data-name="${item.name}" data-price="${item.price}" data-image="${encodeURIComponent(item.image_url || '')}" data-type="${item.type}" data-condition="${item.condition || ''}" data-attributes='${JSON.stringify(item.attributes)}'>Add</button>
           </li>
-        `).join('')}  // Lists inventory items with Add buttons
+        `).join('')} 
       </ul>
       <div>
-        <button id="sell-prev-page" ${page === 1 ? 'disabled' : ''}>Previous</button>  // Previous page button, disabled on first page
-        <span>Page ${page} of ${totalPages}</span>  // Displays current page info
-        <button id="sell-next-page" ${page >= totalPages ? 'disabled' : ''}>Next</button>  // Next page button, disabled on last page
+        <button id="sell-prev-page" ${page === 1 ? 'disabled' : ''}>Previous</button> 
+        <span>Page ${page} of ${totalPages}</span> 
+        <button id="sell-next-page" ${page >= totalPages ? 'disabled' : ''}>Next</button> 
       </div>
     </div>
     <div>
@@ -48,17 +48,17 @@ function render(page, searchTerm, cart, inventory = null, total = null) {
       <ul id="sell-cart-items">
         ${cart.map(item => `
           <li>
-            ${item.image_url ? `<img src="${decodeURIComponent(item.image_url)}" alt="${item.name}" style="max-width: 50px;">` : 'No Image'}  // Displays cart item image
+            ${item.image_url ? `<img src="${decodeURIComponent(item.image_url)}" alt="${item.name}" style="max-width: 50px;">` : 'No Image'}  
             ${item.name} (${item.type}${formatAttributes(item.attributes)}) - 
-            <input type="number" value="${item.negotiatedPrice || item.price}" class="sell-price-input" data-id="${item.id}" style="width: 60px;">  // Editable negotiated price
-            (Original: ${cleanPrice(item.price)}, ${item.condition || 'Not Set'})  // Shows original price and condition
+            <input type="number" value="${item.negotiatedPrice || item.price}" class="sell-price-input" data-id="${item.id}" style="width: 60px;">  
+            (Original: ${cleanPrice(item.price)}, ${item.condition || 'Not Set'})  
           </li>
-        `).join('')}  // Lists cart items with editable prices
+        `).join('')}  
       </ul>
-      <p>Total Listed: ${cleanPrice(totalListed.toFixed(2))}, Items: ${cart.length}</p>  // Displays total listed price and item count
-      <p>Total Negotiated: ${cleanPrice(totalNegotiated.toFixed(2))}</p>  // Displays total negotiated price
-      <button id="complete-sell">Complete Sell</button>  // Button to complete transaction
-      <button id="clear-sell-cart">Clear Cart</button>  // Button to clear cart
+      <p>Total Listed: ${cleanPrice(totalListed.toFixed(2))}, Items: ${cart.length}</p>  
+      <p>Total Negotiated: ${cleanPrice(totalNegotiated.toFixed(2))}</p>  
+      <button id="complete-sell">Complete Sell</button> 
+      <button id="clear-sell-cart">Clear Cart</button>  
     </div>
   `;  // Sets the HTML content for the Sell tab
 

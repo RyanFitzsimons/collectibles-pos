@@ -101,13 +101,13 @@ function render(page, searchTerm, inCart, outCart, inventory = null, total = nul
           <ul id="trade-in-items">
             ${inCart.map(item => `
               <li>
-                ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}" style="max-width: 50px;">` : ''}  // Displays trade-in item image
+                ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}" style="max-width: 50px;">` : ''} 
                 ${item.name} (${item.type}) - ${cleanPrice(item.tradeValue)} (${item.condition || 'Not Set'})
               </li>
-            `).join('')}  // Lists trade-in cart items
+            `).join('')}  
           </ul>
-          <p>Total Trade-In Value: ${cleanPrice(tradeInTotal.toFixed(2))}, Items: ${inCart.length}</p>  // Shows total trade-in value and item count
-          <button id="clear-trade-in-cart">Clear Cart</button>  // Button to clear trade-in cart
+          <p>Total Trade-In Value: ${cleanPrice(tradeInTotal.toFixed(2))}, Items: ${inCart.length}</p>  
+          <button id="clear-trade-in-cart">Clear Cart</button> 
         </div>
       </div>
       <div class="trade-section trade-out">
@@ -117,16 +117,16 @@ function render(page, searchTerm, inCart, outCart, inventory = null, total = nul
           <ul id="trade-out-inventory-list">
             ${inventory.map(item => `
               <li>
-                ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}">` : ''}  // Displays inventory item image
+                ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}">` : ''}  
                 ${item.name} (${item.type}) - ${cleanPrice(item.price)} (${item.condition || 'Not Set'}) 
                 <button class="add-to-trade-out" data-id="${item.id}" data-name="${item.name}" data-price="${item.price}" data-image="${encodeURIComponent(item.image_url || '')}" data-set="${item.attributes.card_set || ''}" data-condition="${item.condition || ''}">Add</button>
               </li>
-            `).join('')}  // Lists trade-out inventory items with Add buttons
+            `).join('')}  
           </ul>
           <div>
-            <button id="trade-out-prev-page" ${page === 1 ? 'disabled' : ''}>Previous</button>  // Previous page button
-            <span>Page ${page} of ${totalPages}</span>  // Page info
-            <button id="trade-out-next-page" ${page >= totalPages ? 'disabled' : ''}>Next</button>  // Next page button
+            <button id="trade-out-prev-page" ${page === 1 ? 'disabled' : ''}>Previous</button>  
+            <span>Page ${page} of ${totalPages}</span> 
+            <button id="trade-out-next-page" ${page >= totalPages ? 'disabled' : ''}>Next</button> 
           </div>
         </div>
         <div class="section">
@@ -134,18 +134,18 @@ function render(page, searchTerm, inCart, outCart, inventory = null, total = nul
           <ul id="trade-out-items">
             ${outCart.map(item => `
               <li>
-                ${item.image_url ? `<img src="${decodeURIComponent(item.image_url)}" alt="${item.name}" style="max-width: 50px;">` : 'No Image'}  // Displays trade-out cart item image
+                ${item.image_url ? `<img src="${decodeURIComponent(item.image_url)}" alt="${item.name}" style="max-width: 50px;">` : 'No Image'}  
                 ${item.name} (${item.type}) - 
-                <input type="number" value="${item.negotiatedPrice || item.price}" class="trade-out-price-input" data-id="${item.id}" style="width: 60px;">  // Editable negotiated price
-                (Original: ${cleanPrice(item.price)}, ${item.condition || 'Not Set'})  // Shows original price and condition
+                <input type="number" value="${item.negotiatedPrice || item.price}" class="trade-out-price-input" data-id="${item.id}" style="width: 60px;">  
+                (Original: ${cleanPrice(item.price)}, ${item.condition || 'Not Set'})  
               </li>
-            `).join('')}  // Lists trade-out cart items with editable prices
+            `).join('')}  
           </ul>
-          <p>Total Trade-Out Value: ${cleanPrice(tradeOutTotal.toFixed(2))}, Items: ${outCart.length}</p>  // Shows total trade-out value and item count
-          <p>Cash Due: ${cleanPrice(cashDue.toFixed(2))}</p>  // Shows cash customer owes
-          ${cashBack > 0 ? `<p>Cash Back: ${cleanPrice(cashBack.toFixed(2))}</p>` : ''}  // Shows cash back if applicable
-          <button id="complete-trade">Complete Trade</button>  // Button to complete transaction
-          <button id="clear-trade-out-cart">Clear Cart</button>  // Button to clear trade-out cart
+          <p>Total Trade-Out Value: ${cleanPrice(tradeOutTotal.toFixed(2))}, Items: ${outCart.length}</p>  
+          <p>Cash Due: ${cleanPrice(cashDue.toFixed(2))}</p>  
+          ${cashBack > 0 ? `<p>Cash Back: ${cleanPrice(cashBack.toFixed(2))}</p>` : ''} 
+          <button id="complete-trade">Complete Trade</button>  
+          <button id="clear-trade-out-cart">Clear Cart</button>  
         </div>
       </div>
     </div>

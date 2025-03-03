@@ -76,14 +76,14 @@ function render() {
     const tbody = document.getElementById('reconciliations-list');  // Gets table body for past reconciliations
     tbody.innerHTML = rows.map(row => `
       <tr>
-        <td>${new Date(row.date).toLocaleString()}</td>  // Formats date as local string
-        <td>${cleanPrice(row.starting_cash.toFixed(2))}</td>  // Formats starting cash
-        <td>${cleanPrice(row.total_cash_in.toFixed(2))}</td>  // Formats total cash in
-        <td>${cleanPrice(row.total_cash_out.toFixed(2))}</td>  // Formats total cash out
-        <td>${cleanPrice(row.expected_cash.toFixed(2))}</td>  // Formats expected cash
-        <td>${cleanPrice(row.actual_cash.toFixed(2))}</td>  // Formats actual cash
-        <td>${cleanPrice(row.discrepancy.toFixed(2))}</td>  // Formats discrepancy
-        <td>${row.notes || ''}</td>  // Displays notes or empty string if none
+        <td>${new Date(row.date).toLocaleString()}</td> 
+        <td>${cleanPrice(row.starting_cash.toFixed(2))}</td>  
+        <td>${cleanPrice(row.total_cash_in.toFixed(2))}</td>  
+        <td>${cleanPrice(row.total_cash_out.toFixed(2))}</td>  
+        <td>${cleanPrice(row.expected_cash.toFixed(2))}</td>  
+        <td>${cleanPrice(row.actual_cash.toFixed(2))}</td>  
+        <td>${cleanPrice(row.discrepancy.toFixed(2))}</td>  
+        <td>${row.notes || ''}</td>  
       </tr>
     `).join('');  // Populates table with reconciliation rows
   });

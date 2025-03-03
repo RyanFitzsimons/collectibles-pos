@@ -79,10 +79,10 @@ function render() {
             <label>End Date</label>
             <input id="transactions-end-date" type="date" value="${endDate}">
           </div>
-          <p>Stats: Total: ${stats.total}, Sells: ${stats.sells}, Buys: ${stats.buys}, Trades: ${stats.trades}</p>  // Displays transaction stats
-          <p>Total Cash In: ${cleanPrice(totalCashIn.toFixed(2))}</p>  // Shows total cash in
-          <p>Total Cash Out: ${cleanPrice(totalCashOut.toFixed(2))}</p>  // Shows total cash out
-          <button id="export-csv">Export to CSV</button>  // Button to export transactions as CSV
+          <p>Stats: Total: ${stats.total}, Sells: ${stats.sells}, Buys: ${stats.buys}, Trades: ${stats.trades}</p>  
+          <p>Total Cash In: ${cleanPrice(totalCashIn.toFixed(2))}</p> 
+          <p>Total Cash Out: ${cleanPrice(totalCashOut.toFixed(2))}</p>  
+          <button id="export-csv">Export to CSV</button>  
           <table class="transactions-table">
             <thead>
               <tr>
@@ -98,34 +98,34 @@ function render() {
             <tbody>
               ${paginatedTransactions.map(([id, tx]) => `
                 <tr class="${tx.type}">
-                  <td>${id}</td>  // Transaction ID
-                  <td>${tx.type || 'Unknown'}</td>  // Transaction type or 'Unknown' if null
-                  <td>${cleanPrice(tx.cash_in || 0)}</td>  // Cash in, defaults to 0
-                  <td>${cleanPrice(tx.cash_out || 0)}</td>  // Cash out, defaults to 0
-                  <td>${tx.timestamp}</td>  // Timestamp as stored
+                  <td>${id}</td> 
+                  <td>${tx.type || 'Unknown'}</td>  
+                  <td>${cleanPrice(tx.cash_in || 0)}</td>  
+                  <td>${cleanPrice(tx.cash_out || 0)}</td>  
+                  <td>${tx.timestamp}</td>  
                   <td>
-                    <button class="toggle-items" data-id="${id}">Show Items</button>  // Button to toggle item details
+                    <button class="toggle-items" data-id="${id}">Show Items</button>  
                     <ul class="items-list" id="items-${id}" style="display: none;">
                       ${tx.items.map(item => `
                         <li>
-                          ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}">` : ''}  // Displays item image if available
+                          ${item.image_url ? `<img src="${item.image_url}" alt="${item.name}">` : ''}  
                           ${item.name} (${item.type}${formatAttributes(item.attributes)}) (${item.condition || 'Not Set'}) (${item.role === 'trade_in' ? 'Trade-In' : item.role === 'trade_out' ? 'Trade-Out' : 'Sold'}) - 
                           ${item.role === 'trade_in' ? `Trade Value: ${cleanPrice(item.trade_value || 0)}` : `Sold For: ${cleanPrice(item.negotiated_price || item.original_price || 0)}`}
                         </li>
-                      `).join('')}  // Lists transaction items with details
+                      `).join('')}  
                     </ul>
                   </td>
                   <td>
-                    <button class="print-receipt" data-transaction-id="${id}">Print Receipt</button>  // Button to print receipt
+                    <button class="print-receipt" data-transaction-id="${id}">Print Receipt</button> 
                   </td>
                 </tr>
-              `).join('')}  // Renders paginated transactions
+              `).join('')}  
             </tbody>
           </table>
           <div class="pagination">
-            <button id="prev-page" ${currentPage === 1 ? 'disabled' : ''}>Previous</button>  // Previous page button
-            <span>Page ${currentPage} of ${totalPages}</span>  // Page info
-            <button id="next-page" ${currentPage >= totalPages ? 'disabled' : ''}>Next</button>  // Next page button
+            <button id="prev-page" ${currentPage === 1 ? 'disabled' : ''}>Previous</button> 
+            <span>Page ${currentPage} of ${totalPages}</span>  
+            <button id="next-page" ${currentPage >= totalPages ? 'disabled' : ''}>Next</button>  
           </div>
         </div>
       `;  // Sets the HTML content for the Transactions tab
